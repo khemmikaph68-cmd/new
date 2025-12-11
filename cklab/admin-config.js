@@ -5,7 +5,7 @@ let adminModal, zoneModal;
 document.addEventListener('DOMContentLoaded', () => {
     // 1. เช็ค Database
     if (typeof DB === 'undefined' || typeof DB.getAdmins !== 'function') {
-        alert("Critical Error: ไฟล์ mock-db.js ไม่สมบูรณ์ (ขาดฟังก์ชัน getAdmins)");
+        alert("Critical Error: ไฟล์ mock-db.js ไม่สมบูรณ์");
         return;
     }
 
@@ -24,11 +24,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if(zoneModalEl) zoneModal = new bootstrap.Modal(zoneModalEl);
 
     // 4. Render Data
-    renderAdmins();
-    renderZones();
+    loadGeneralConfig(); // ✅ โหลดค่า Setting ทั่วไป
+    renderAdmins();      // โหลดรายชื่อ Admin
+    renderZones();       // โหลดโซน
 });
 
-// --- ADMIN FUNCTIONS ---
+// --- 1. GENERAL CONFIG FUNCTIONS (เพิ่มส่วนนี้) ---
+
+function loadGeneralConfig() {
+    const config = DB.getGeneralConfig(); // ดึงจาก mock-db
+    if (config) {
+        // นำค่ามาใส่ใน Input (ใช้ ID ตามไฟล์ HTML ล่าสุด)
+        document.getElementById('confLabName').value = config.labName || '';
+        document.getElementById('confLocation').value = config.labLocation || '';
+        document.getElementById('confEmail').value = config.contactEmail || '';
+        document.getElementById('confMaxTime').value = config.maxDurationMinutes || 180;
+    }
+}
+
+function saveGeneralConfig() {
+    // 1. สร้าง Object ข้อมูลใหม่จากฟอร์ม
+    const newConfig = {
+        labName: document.getElementById('confLabName').value.trim(),
+        labLocation: document.getElementById('confLocation').value.trim(),
+        contactEmail: document.getElementById('confEmail').value.trim(),
+        maxDurationMinutes: parseInt(document.getElementById('confMaxTime').value) || 180
+    };
+
+    // 2. บันทึกลง DB
+    DB.saveGeneralConfig(newConfig);
+
+    // 3. แจ้งเตือน
+    alert('✅ บันทึกการตั้งค่าเรียบร้อยแล้ว');
+}
+
+// --- 2. ADMIN FUNCTIONS (ของเดิม) ---
 
 function renderAdmins() {
     const tbody = document.getElementById('adminTableBody');
@@ -71,15 +101,13 @@ function openAdminModal() {
 }
 
 function saveAdmin() {
-    // ดึงค่าจาก Form
     const name = document.getElementById('adminName').value.trim();
     const user = document.getElementById('adminUser').value.trim();
     const pass = document.getElementById('adminPass').value.trim();
     const role = document.getElementById('adminRole').value;
 
-    // ตรวจสอบค่าว่าง
     if(!name || !user || !pass) {
-        alert('กรุณากรอกข้อมูลให้ครบถ้วน (ชื่อ, Username, Password)');
+        alert('กรุณากรอกข้อมูลให้ครบถ้วน');
         return;
     }
 
@@ -88,25 +116,20 @@ function saveAdmin() {
     // ตรวจสอบ Username ซ้ำ
     const existing = admins.find(a => a.user === user);
     if (existing) {
-        alert("Username นี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น");
+        alert("Username นี้มีอยู่ในระบบแล้ว");
         return;
     }
 
-    // สร้าง ID ใหม่
     const newId = 'a' + Date.now();
-    
-    // เพิ่มข้อมูล
     admins.push({ id: newId, name, user, pass, role });
     DB.saveAdmins(admins);
     
-    // ปิด Modal และรีเฟรชตาราง
     if(adminModal) adminModal.hide();
     renderAdmins();
     alert("✅ เพิ่มผู้ดูแลเรียบร้อย");
 }
 
 function deleteAdmin(id) {
-    // ป้องกันการลบตัวเอง หรือ Super Admin หลัก (id: a1)
     if (id === 'a1') {
         alert("ไม่สามารถลบ Super Admin หลักได้");
         return;
@@ -133,7 +156,7 @@ function togglePass(id) {
     }
 }
 
-// --- ZONE FUNCTIONS ---
+// --- 3. ZONE FUNCTIONS (ของเดิม) ---
 
 function renderZones() {
     const list = document.getElementById('zoneList');
