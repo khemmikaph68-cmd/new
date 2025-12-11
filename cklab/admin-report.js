@@ -518,3 +518,144 @@ function exportCSV() {
         alert(`✅ ดาวน์โหลดไฟล์ CSV ${filteredLogs.length} รายการ เรียบร้อยแล้ว`);
     }
 }
+
+function exportReport(mode) {
+    const today = new Date();
+    let startDate, endDate, fileNamePrefix;
+
+    // 1. คำนวณช่วงเวลา
+    switch(mode) {
+        case 'daily':
+            // วันนี้ (เริ่ม 00:00 - จบ 23:59 ของวันนี้)
+            startDate = new Date(today);
+            endDate = new Date(today);
+            fileNamePrefix = `Daily_Report_${formatDateStr(today)}`;
+            break;
+
+        case 'monthly':
+            // ต้นเดือน - ปลายเดือน
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            fileNamePrefix = `Monthly_Report_${today.getFullYear()}_${today.getMonth()+1}`;
+            break;
+
+        case 'yearly':
+            // 1 ม.ค. - 31 ธ.ค.
+            startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = new Date(today.getFullYear(), 11, 31);
+            fileNamePrefix = `Yearly_Report_${today.getFullYear()}`;
+            break;
+            
+        default: // กรณี Custom Filter (ใช้ฟังก์ชัน exportCSV เดิม)
+            exportCSV(); 
+            return;
+    }
+
+    // 2. เรียกฟังก์ชันสร้างไฟล์ CSV โดยส่งวันที่ที่คำนวณได้ไปให้
+    generateCSV(startDate, endDate, fileNamePrefix);
+}
+
+// ฟังก์ชันสร้างไฟล์ CSV (แยกออกมาเพื่อให้ใช้ร่วมกันได้)
+function generateCSV(startDateObj, endDateObj, fileNamePrefix) {
+    const allLogs = DB.getLogs();
+
+    // กรองข้อมูลตามช่วงเวลา
+    const filteredLogs = allLogs.filter(log => {
+        const logDate = new Date(log.timestamp).setHours(0,0,0,0);
+        return logDate >= startDateObj.setHours(0,0,0,0) && 
+               logDate <= endDateObj.setHours(0,0,0,0);
+    });
+
+    if (filteredLogs.length === 0) {
+        alert('ไม่พบข้อมูลในช่วงเวลาดังกล่าว');
+        return;
+    }
+
+    // สร้างเนื้อหา CSV Header
+    let csvContent = "ลำดับ,วันที่,เวลาเข้า,เวลาออก,ชื่อผู้ใช้,รหัส/ID,คณะ/หน่วยงาน,ประเภท,PC ID,Software/AI ที่ใช้,ระยะเวลา(นาที),ความพึงพอใจ\n";
+
+    // วนลูปสร้างแถวข้อมูล
+    filteredLogs.forEach((log, index) => {
+        const dateStr = new Date(log.timestamp).toLocaleDateString('th-TH');
+        const timeIn = log.startTime ? new Date(log.startTime).toLocaleTimeString('th-TH') : '-';
+        const timeOut = new Date(log.timestamp).toLocaleTimeString('th-TH');
+        
+        let swStr = (log.usedSoftware && log.usedSoftware.length > 0) ? log.usedSoftware.join('; ') : "-";
+        const clean = (text) => text ? String(text).replace(/,/g, " ") : "-";
+
+        const row = [
+            index + 1,
+            dateStr,
+            timeIn,
+            timeOut,
+            clean(log.userName),
+            clean(log.userId),
+            clean(log.userFaculty),
+            clean(getUserType(log)),
+            clean(log.pcId),
+            `"${swStr}"`,
+            log.durationMinutes || 0,
+            log.satisfactionScore || "-"
+        ];
+        csvContent += row.join(",") + "\n";
+    });
+
+    // ดาวน์โหลดไฟล์
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${fileNamePrefix}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Helper: แปลง Date เป็น string สั้นๆ สำหรับตั้งชื่อไฟล์
+function formatDateStr(date) {
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+// Helper: แยกประเภทผู้ใช้ (ถ้ามีอยู่แล้วไม่ต้องใส่ซ้ำ)
+function getUserType(log) {
+    if (log.userRole === 'external' || log.userRole === 'Guest') return 'External';
+    return 'Internal';
+}
+
+/* admin-report.js */
+
+// เพิ่มบรรทัดนี้ใน document.addEventListener('DOMContentLoaded', ...)
+document.addEventListener('DOMContentLoaded', () => {
+    // ... โค้ดเดิม ...
+    renderLifetimeStats(); // <--- เรียกฟังก์ชันนี้ให้ทำงาน
+});
+
+// --- ฟังก์ชันคำนวณยอดสะสมทั้งหมด ---
+function renderLifetimeStats() {
+    const allLogs = DB.getLogs(); // ดึง Log ทั้งหมดจาก Database
+    const total = allLogs.length;
+
+    // นับแยกประเภท (Internal vs External)
+    let internalCount = 0;
+    let externalCount = 0;
+
+    allLogs.forEach(log => {
+        if (log.userRole === 'external' || log.userRole === 'Guest') {
+            externalCount++;
+        } else {
+            internalCount++;
+        }
+    });
+
+    // แสดงตัวเลข (ใส่ลูกน้ำคั่นหลักพัน)
+    document.getElementById('lifetimeTotalCount').innerText = total.toLocaleString();
+    document.getElementById('lifetimeInternal').innerText = internalCount.toLocaleString();
+    document.getElementById('lifetimeExternal').innerText = externalCount.toLocaleString();
+
+    // คำนวณ % เพื่อทำหลอดพลัง (Progress Bar)
+    const intPercent = total > 0 ? (internalCount / total) * 100 : 0;
+    const extPercent = total > 0 ? (externalCount / total) * 100 : 0;
+
+    document.getElementById('progInternal').style.width = `${intPercent}%`;
+    document.getElementById('progExternal').style.width = `${extPercent}%`;
+}
