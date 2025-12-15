@@ -51,7 +51,7 @@ function updateClock() {
 function checkAndSwitchBookingQueue() {
     const pcs = DB.getPCs();
     const bookings = DB.getBookings();
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     let hasChanges = false;

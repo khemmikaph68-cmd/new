@@ -10,7 +10,7 @@ const DEFAULT_BOOKINGS = [
         id: 'b1', 
         userId: '66123456', userName: 'สมชาย รักเรียน', 
         pcId: '1', pcName: 'PC-01', 
-        date: new Date().toISOString().split('T')[0], // วันนี้
+        date: new Date().toLocaleDateString('en-CA'), // วันนี้
         startTime: '09:00', endTime: '11:00', 
         note: 'ทำโปรเจกต์จบ', 
         status: 'pending' // pending, approved, rejected
@@ -19,7 +19,7 @@ const DEFAULT_BOOKINGS = [
         id: 'b2', 
         userId: 'External', userName: 'คุณวิชัย (Guest)', 
         pcId: '5', pcName: 'PC-05', 
-        date: new Date().toISOString().split('T')[0], // วันนี้
+        date: new Date().toLocaleDateString('en-CA'), // วันนี้
         startTime: '13:00', endTime: '15:00', 
         note: 'ทดสอบ AI', 
         status: 'approved' 

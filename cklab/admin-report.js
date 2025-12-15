@@ -418,8 +418,8 @@ function autoSetDates() {
     } 
 }
 
-function formatDateForInput(date) { return date.toISOString().split('T')[0]; }
-function formatDateStr(date) { return date.toISOString().split('T')[0]; }
+function formatDateForInput(date) { return date.toLocaleDateString('en-CA'); }
+function formatDateStr(date) { return date.toLocaleDateString('en-CA'); }
 function getSatisfactionDisplay(score) { if (!score) return '-'; const c = score>=4?'success':(score>=2?'warning text-dark':'danger'); return `<span class="badge bg-${c}"><i class="bi bi-star-fill"></i> ${score}</span>`; }
 function renderLifetimeStats() { const logs = DB.getLogs(); document.getElementById('lifetimeTotalCount').innerText = logs.length.toLocaleString(); }
 function processImportCSV(el) { alert('ฟังก์ชัน Import CSV ทำงานปกติ (จำลอง)'); }
@@ -467,7 +467,7 @@ function exportCSV() {
     if (filteredLogs.length === 0) { alert("ไม่พบข้อมูล Log ตามเงื่อนไขที่เลือก"); return; }
     
     // ตั้งชื่อไฟล์ default
-    const fileName = `Usage_Report_${new Date().toISOString().slice(0, 10)}`;
+    const fileName = `Usage_Report_${new Date().toLocaleDateString('en-CA')}`;
     
     // เรียกใช้ generateCSV แต่ส่งข้อมูลที่กรองแล้วไปเลย (ต้องปรับ generateCSV นิดหน่อยให้รองรับ)
     // เพื่อความง่าย: ใช้ Logic ใน generateCSV สร้างไฟล์เลยดีกว่า

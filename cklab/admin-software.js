@@ -59,7 +59,7 @@ function renderTable() {
         // เช็ควันหมดอายุ
         let expireHtml = '';
         if (item.expire) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             const isExpired = item.expire < today;
             const colorClass = isExpired ? 'text-danger fw-bold' : 'text-muted';
             const icon = isExpired ? 'bi-exclamation-circle-fill' : 'bi-clock-history';
