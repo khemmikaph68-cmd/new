@@ -214,6 +214,7 @@ function confirmCheckIn() {
             alert(`⏳ ยังไม่ถึงเวลาจอง\nคิวของคุณคือ ${validBooking.startTime} - ${validBooking.endTime}`);
             return;
         }
+        DB.updateBookingStatus(validBooking.id, 'completed');
     }
     // ✅ จบส่วนที่เพิ่ม
 
