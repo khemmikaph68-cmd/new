@@ -1,23 +1,29 @@
-/* main.css - Final Version with Print Styles */
+/* main.css - Final Consolidated Stylesheet */
+
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 
 :root {
     --primary: #2c3e50;    /* กรมท่าเข้ม */
-    --accent: #003366;     /* น้ำเงินมหาลัย */
+    --accent: #003366;     /* น้ำเงินมหาลัย (Main Brand Color) */
     --gray-light: #f8f9fa; /* พื้นหลัง */
     --border: #e9ecef;     
     --text: #495057;
-    --success: #28a745;    /* สีเขียวสถานะ */
+    --success: #28a745;    
+    --warning: #ffc107;    
+    --danger: #dc3545;     
 }
 
 body {
     background-color: var(--gray-light);
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Sarabun', 'Prompt', sans-serif;
     color: var(--text);
     font-weight: 300;
 }
 
-/* --- KIOSK CARD --- */
+/* =========================================
+   KIOSK CARD & LAYOUT
+   ========================================= */
 .kiosk-card {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -47,7 +53,7 @@ body {
     padding: 20px 40px 40px;
 }
 
-/* --- STATUS INDICATORS (ส่วนที่เพิ่มมา) --- */
+/* --- STATUS INDICATORS --- */
 .status-indicator {
     display: inline-block;
     width: 10px; height: 10px;
@@ -118,7 +124,6 @@ body {
     box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
 }
 
-/* Input Group แต่งสวย */
 .input-group-text {
     background-color: white;
     border: 1px solid var(--border);
@@ -165,7 +170,6 @@ body {
     background-color: #002244;
 }
 
-/* ปุ่ม Usage Type */
 .btn-check:checked + .btn-outline-primary {
     background-color: var(--accent);
     border-color: var(--accent);
@@ -204,10 +208,8 @@ hr {
 
 
 /* =========================================
-   ส่วนที่เพิ่มสำหรับหน้า FEEDBACK
+   FEEDBACK PAGE STYLES
    ========================================= */
-
-/* 1. Success Animation (วงกลมเช็คถูก) */
 .success-animation { margin: 0 auto 20px; }
 .checkmark {
     width: 80px; height: 80px;
@@ -239,7 +241,6 @@ hr {
 @keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
 @keyframes fill { 100% { box-shadow: inset 0px 0px 0px 50px #4bb71b; } }
 
-/* 2. Star Rating */
 .star-rating {
     display: inline-flex;
     gap: 10px;
@@ -262,7 +263,6 @@ hr {
     text-shadow: 0 4px 10px rgba(255, 193, 7, 0.4);
 }
 
-/* 3. Feedback Box */
 .feedback-box {
     background: #f8f9fa;
     border-radius: 12px;
@@ -274,21 +274,97 @@ hr {
     background-color: #fff;
 }
 
+.drop-shadow-sm {
+    filter: drop-shadow(0px 1px 1px rgba(0,0,0,0.1));
+    margin-right: 2px;
+    font-size: 1.2rem;
+}
+
+#satisfactionAvgScore {
+    line-height: 1;
+    letter-spacing: -2px;
+}
+
+.progress-bar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
 
 /* =========================================
-   PRINT STYLES (สำหรับหน้า Reports)
+   MODERN LAB CLOSED MODAL (Blue Theme)
+   ========================================= */
+.modal-closed-modern .modal-content {
+    border: none;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 25px 50px -12px rgba(0, 51, 102, 0.15); /* เงาสีน้ำเงินจาง */
+    overflow: hidden;
+}
+
+/* แถบด้านบน: สีน้ำเงิน CKLab */
+.modal-header-deco {
+    height: 8px;
+    background: linear-gradient(90deg, #003366, #0d6efd);
+    width: 100%;
+}
+
+.icon-container-lg {
+    width: 100px;
+    height: 100px;
+    background-color: #f0f4f8; /* พื้นหลังไอคอนเทาอมฟ้า */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+    position: relative;
+    border: 1px solid #e1e8ef;
+}
+
+.icon-container-lg i {
+    font-size: 3.5rem;
+    color: #003366; /* สีไอคอนน้ำเงินเข้ม */
+    filter: drop-shadow(0 4px 6px rgba(0, 51, 102, 0.2));
+}
+
+/* Animation Pulse: สีน้ำเงิน */
+.animate-pulse-blue {
+    animation: pulseBlue 2s infinite;
+}
+
+@keyframes pulseBlue {
+    0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.2); }
+    70% { box-shadow: 0 0 0 20px rgba(13, 110, 253, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); }
+}
+
+/* ✅✅✅ กล่องข้อความ Admin Message (แก้ไขให้เด่นชัดขึ้น) ✅✅✅ */
+.message-box {
+    background-color: #f0f7ff; /* พื้นหลังฟ้าอ่อน */
+    border: 1px solid #cce5ff; /* เส้นขอบบางๆ รอบกล่อง */
+    border-left: 6px solid #003366; /* เส้นด้านซ้ายหนาสีน้ำเงินเข้ม */
+    border-radius: 10px;
+    padding: 20px;
+    text-align: left;
+    margin-top: 20px;
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); /* เพิ่มเงา */
+}
+
+
+/* =========================================
+   PRINT STYLES
    ========================================= */
 @media print {
-    /* ซ่อน Sidebar, ปุ่มกด, ช่องค้นหา, และฟอร์มตัวกรอง */
     #sidebar-container, 
     .btn, 
-    .d-flex.gap-2, /* ปุ่มกลุ่ม Import/Export */
+    .d-flex.gap-2, 
     form#reportFilterForm,
-    .card-header button { 
+    .card-header button,
+    .search-box-pill { 
         display: none !important; 
     }
 
-    /* ขยายเนื้อหาให้เต็มกระดาษ */
     .flex-grow-1 {
         padding: 0 !important;
         margin: 0 !important;
@@ -297,12 +373,12 @@ hr {
         overflow: visible !important;
     }
 
-    /* ปรับพื้นหลังให้ขาวล้วน */
     body, .bg-light {
         background-color: white !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 
-    /* บังคับให้กราฟไม่ถูกตัดหน้า */
     canvas {
         max-width: 100% !important;
         break-inside: avoid;
@@ -311,26 +387,6 @@ hr {
     .card {
         border: none !important;
         box-shadow: none !important;
-        break-inside: avoid; /* พยายามไม่ให้การ์ดถูกตัดครึ่งหน้า */
+        break-inside: avoid;
     }
-}
-
-/* main.css - เพิ่มส่วนท้ายไฟล์ */
-
-/* ทำให้ดาวดูมีมิติ */
-.drop-shadow-sm {
-    filter: drop-shadow(0px 1px 1px rgba(0,0,0,0.1));
-    margin-right: 2px;
-    font-size: 1.2rem;
-}
-
-/* ปรับพื้นที่ส่วนคะแนนให้ดูโปร่ง */
-#satisfactionAvgScore {
-    line-height: 1;
-    letter-spacing: -2px;
-}
-
-/* ทำให้ Progress bar ดูนุ่มนวล */
-.progress-bar {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }

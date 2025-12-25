@@ -1,6 +1,6 @@
-/* admin-config.js */
+/* admin-config.js (Cleaned Version: No Zones) */
 
-let adminModal, zoneModal;
+let adminModal;
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. เช็ค Database
@@ -9,56 +9,100 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // 2. เช็ค Session
-    const session = DB.getSession();
-    if (!session || !session.user || session.user.role !== 'admin') {
-        window.location.href = 'admin-login.html';
-        return;
-    }
-
-    // 3. Init Modals
+    // 2. Init Admin Modal Only
     const adminModalEl = document.getElementById('adminModal');
-    const zoneModalEl = document.getElementById('zoneModal');
-    
     if(adminModalEl) adminModal = new bootstrap.Modal(adminModalEl);
-    if(zoneModalEl) zoneModal = new bootstrap.Modal(zoneModalEl);
 
-    // 4. Render Data
-    loadGeneralConfig(); // ✅ โหลดค่า Setting ทั่วไป
-    renderAdmins();      // โหลดรายชื่อ Admin
-    renderZones();       // โหลดโซน
+    // 3. Render Data
+    loadGeneralConfig(); 
+    renderAdmins();      
+
+    // 4. Bind Events (เพื่อให้กด Switch ปิดห้องแล้วข้อความเปลี่ยนทันที)
+    const switchEl = document.getElementById('labStatusSwitch');
+    if (switchEl) {
+        switchEl.addEventListener('change', toggleLabStatusUI);
+    }
 });
 
-// --- 1. GENERAL CONFIG FUNCTIONS (เพิ่มส่วนนี้) ---
+// ==========================================
+// 1. GENERAL CONFIG FUNCTIONS
+// ==========================================
 
 function loadGeneralConfig() {
-    const config = DB.getGeneralConfig(); // ดึงจาก mock-db
-    if (config) {
-        // นำค่ามาใส่ใน Input (ใช้ ID ตามไฟล์ HTML ล่าสุด)
-        document.getElementById('confLabName').value = config.labName || '';
-        document.getElementById('confLocation').value = config.labLocation || '';
-        document.getElementById('confEmail').value = config.contactEmail || '';
-        document.getElementById('confMaxTime').value = config.maxDurationMinutes || 180;
+    const config = DB.getGeneralConfig(); 
+    if (!config) return;
+
+    // 1.1 ข้อมูลพื้นฐาน
+    if(document.getElementById('confLabName')) document.getElementById('confLabName').value = config.labName || '';
+    if(document.getElementById('confLocation')) document.getElementById('confLocation').value = config.labLocation || '';
+    if(document.getElementById('confEmail')) document.getElementById('confEmail').value = config.contactEmail || '';
+    if(document.getElementById('confMaxTime')) document.getElementById('confMaxTime').value = config.maxDurationMinutes || 180;
+
+    // 1.2 ข้อมูลติดต่อ
+    if(document.getElementById('confAdminOnDuty')) {
+        document.getElementById('confAdminOnDuty').value = config.adminOnDuty || '';
+    }
+    if(document.getElementById('confPhone')) {
+        document.getElementById('confPhone').value = config.contactPhone || '';
+    }
+
+    // 1.3 สถานะห้อง (Lab Status)
+    if(document.getElementById('labStatusSwitch')) {
+        const isOpen = config.labStatus !== 'closed'; 
+        document.getElementById('labStatusSwitch').checked = isOpen;
+        toggleLabStatusUI(); 
+    }
+
+    // 1.4 ข้อความแจ้งเตือน
+    if(document.getElementById('adminMessage')) {
+        document.getElementById('adminMessage').value = config.adminMessage || '';
+    }
+}
+
+function toggleLabStatusUI() {
+    const switchEl = document.getElementById('labStatusSwitch');
+    const labelEl = document.getElementById('labStatusLabel');
+    const msgInput = document.getElementById('adminMessage');
+    
+    if (switchEl && labelEl) {
+        if (switchEl.checked) {
+            labelEl.innerText = 'เปิดให้บริการ (Open)';
+            labelEl.className = 'form-check-label fw-bold text-success';
+            if(msgInput) msgInput.disabled = true; 
+        } else {
+            labelEl.innerText = 'ปิดปรับปรุงชั่วคราว (Closed)';
+            labelEl.className = 'form-check-label fw-bold text-danger';
+            if(msgInput) msgInput.disabled = false;
+        }
     }
 }
 
 function saveGeneralConfig() {
-    // 1. สร้าง Object ข้อมูลใหม่จากฟอร์ม
+    const currentConfig = DB.getGeneralConfig() || {};
+    const isOpen = document.getElementById('labStatusSwitch').checked;
+    
     const newConfig = {
+        ...currentConfig,
         labName: document.getElementById('confLabName').value.trim(),
         labLocation: document.getElementById('confLocation').value.trim(),
         contactEmail: document.getElementById('confEmail').value.trim(),
-        maxDurationMinutes: parseInt(document.getElementById('confMaxTime').value) || 180
+        maxDurationMinutes: parseInt(document.getElementById('confMaxTime').value) || 180,
+        
+        adminOnDuty: document.getElementById('confAdminOnDuty').value.trim(),
+        contactPhone: document.getElementById('confPhone').value.trim(),
+
+        labStatus: isOpen ? 'open' : 'closed',
+        adminMessage: document.getElementById('adminMessage').value.trim()
     };
 
-    // 2. บันทึกลง DB
     DB.saveGeneralConfig(newConfig);
-
-    // 3. แจ้งเตือน
     alert('✅ บันทึกการตั้งค่าเรียบร้อยแล้ว');
+    loadGeneralConfig(); 
 }
 
-// --- 2. ADMIN FUNCTIONS (ของเดิม) ---
+// ==========================================
+// 2. ADMIN FUNCTIONS
+// ==========================================
 
 function renderAdmins() {
     const tbody = document.getElementById('adminTableBody');
@@ -68,6 +112,7 @@ function renderAdmins() {
     tbody.innerHTML = '';
 
     admins.forEach(admin => {
+        // ซ่อนรหัสผ่าน
         tbody.innerHTML += `
             <tr>
                 <td class="ps-4 fw-bold text-primary">${admin.name}</td>
@@ -82,7 +127,7 @@ function renderAdmins() {
                 </td>
                 <td>${admin.role}</td>
                 <td class="text-end pe-4">
-                    <button onclick="deleteAdmin('${admin.id}')" class="btn btn-sm btn-outline-danger">
+                    <button onclick="deleteAdmin('${admin.id}')" class="btn btn-sm btn-outline-danger" ${admin.id === 'a1' ? 'disabled' : ''}>
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -96,7 +141,6 @@ function openAdminModal() {
     document.getElementById('adminName').value = '';
     document.getElementById('adminUser').value = '';
     document.getElementById('adminPass').value = '';
-    
     if(adminModal) adminModal.show();
 }
 
@@ -112,8 +156,6 @@ function saveAdmin() {
     }
 
     let admins = DB.getAdmins();
-    
-    // ตรวจสอบ Username ซ้ำ
     const existing = admins.find(a => a.user === user);
     if (existing) {
         alert("Username นี้มีอยู่ในระบบแล้ว");
@@ -134,7 +176,6 @@ function deleteAdmin(id) {
         alert("ไม่สามารถลบ Super Admin หลักได้");
         return;
     }
-
     if(confirm('ยืนยันลบผู้ดูแลท่านนี้?')) {
         let admins = DB.getAdmins().filter(a => a.id != id);
         DB.saveAdmins(admins);
@@ -153,50 +194,5 @@ function togglePass(id) {
         input.type = "password";
         icon.classList.remove('bi-eye-slash-fill');
         icon.classList.add('bi-eye-fill');
-    }
-}
-
-// --- 3. ZONE FUNCTIONS (ของเดิม) ---
-
-function renderZones() {
-    const list = document.getElementById('zoneList');
-    if(!list) return;
-
-    const zones = DB.getZones ? DB.getZones() : [];
-    list.innerHTML = '';
-
-    zones.forEach(z => {
-        list.innerHTML += `
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-geo-alt me-2 text-muted"></i>${z.name}</span>
-                <button onclick="deleteZone('${z.id}')" class="btn btn-sm text-danger"><i class="bi bi-x-circle-fill"></i></button>
-            </li>
-        `;
-    });
-}
-
-function openZoneModal() {
-    document.getElementById('zoneName').value = '';
-    if(zoneModal) zoneModal.show();
-}
-
-function saveZone() {
-    const name = document.getElementById('zoneName').value.trim();
-    if(!name) return;
-
-    let zones = DB.getZones();
-    const newId = 'z' + Date.now();
-    zones.push({ id: newId, name });
-    
-    DB.saveZones(zones);
-    if(zoneModal) zoneModal.hide();
-    renderZones();
-}
-
-function deleteZone(id) {
-    if(confirm('ยืนยันลบโซนนี้?')) {
-        let zones = DB.getZones().filter(z => z.id != id);
-        DB.saveZones(zones);
-        renderZones();
     }
 }

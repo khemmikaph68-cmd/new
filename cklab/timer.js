@@ -1,136 +1,266 @@
-/* timer.js (Updated: Precise Slot Countdown) */
+/* timer.js (Final Version: User Extend + Admin Sync) */
 
 let timerInterval; 
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 0. ตรวจสอบ Mock DB
+    // 1. เช็ค DB
     if (typeof DB === 'undefined') {
         document.body.innerHTML = '<div class="alert alert-danger m-5 text-center"><h3>❌ Error</h3><p>ไม่พบฐานข้อมูล (DB is not defined)</p></div>';
         return;
     }
 
-    // 1. ดึงข้อมูล Session
+    // 2. เช็ค Session
     const session = DB.getSession();
-
     if (!session || !session.startTime) {
         alert('⚠️ ไม่พบข้อมูลการใช้งาน กรุณาลงชื่อเข้าใช้ใหม่');
         window.location.href = 'index.html';
         return;
     }
 
-    // 2. แสดงข้อมูลผู้ใช้
+    // 3. แสดงข้อมูล
     const userName = session.user ? session.user.name : 'ผู้ใช้ไม่ระบุชื่อ';
-    const userElement = document.getElementById('userNameDisplay');
-    if (userElement) userElement.innerText = userName;
+    document.getElementById('userNameDisplay').innerText = userName;
     
-    // แสดงข้อมูลเครื่อง
     const pcIdDisplay = session.pcId ? session.pcId.toString().padStart(2,'0') : '??';
-    const pcElement = document.getElementById('pcNameDisplay');
-    if (pcElement) pcElement.innerText = `Station: PC-${pcIdDisplay}`;
+    document.getElementById('pcNameDisplay').innerText = `Station: PC-${pcIdDisplay}`;
     
-    // 3. ตรวจสอบโหมดจับเวลา
-    // ถ้ามี forceEndTime (นาทีจากเที่ยงคืน เช่น 10:30 = 630) ให้เป็นโหมดนับถอยหลัง
+    // 4. เลือกโหมดจับเวลา
     if (session.forceEndTime) {
         console.log("Mode: Countdown (Slot-based)");
-        updateCountdownSlot(); // เรียกครั้งแรกทันที
+        document.getElementById('timerLabel').innerText = "เวลาที่เหลือในรอบนี้ (Remaining Time)";
+        
+        // เริ่มนับถอยหลัง
+        updateCountdownSlot(); 
         timerInterval = setInterval(updateCountdownSlot, 1000); 
+        
+        // ✅ เริ่มระบบ Sync กับ Admin (เฉพาะโหมด AI Slot)
+        setInterval(syncWithAdminUpdates, 5000);
+
     } else {
         console.log("Mode: Normal Timer (Elapsed)");
+        // ซ่อนปุ่มต่อเวลา (เพราะใช้ได้เรื่อยๆ อยู่แล้ว)
+        const btnExtend = document.getElementById('btnExtend');
+        if(btnExtend) btnExtend.style.display = 'none'; 
+        
+        // เริ่มจับเวลาเดินหน้า
         updateTimer(); 
         timerInterval = setInterval(updateTimer, 1000); 
+        
+        // ยังคง Sync เผื่อโดน Force Logout
+        setInterval(syncWithAdminUpdates, 5000);
     }
 });
 
-// --- ฟังก์ชัน 1: นับเวลาเดินหน้า (General Use) ---
+// --- Mode 1: จับเวลาเดินหน้า (General Use) ---
 function updateTimer() {
     const session = DB.getSession(); 
     if (!session) return;
-
     const now = Date.now();
     let diff = now - session.startTime;
-    
     if (diff < 0) diff = 0;
-
-    const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-    const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-
-    const display = document.getElementById('timerDisplay');
-    if (display) display.innerText = `${h}:${m}:${s}`;
+    document.getElementById('timerDisplay').innerText = formatTime(diff);
 }
 
-// --- ฟังก์ชัน 2: นับถอยหลังตามรอบ (AI/Slot Use) ---
-// 
+// --- Mode 2: นับถอยหลัง (AI Slot Use) ---
 function updateCountdownSlot() {
     const session = DB.getSession();
     if (!session) return;
 
-    // 1. แปลง forceEndTime (เช่น 630 นาที) ให้เป็น Date Object ของวันนี้
-    const endMinutesTotal = session.forceEndTime; // ค่าจาก DB เช่น 630 (คือ 10:30)
+    // คำนวณเวลาเป้าหมาย (forceEndTime เป็นนาทีจากเที่ยงคืน)
+    const endMinutesTotal = session.forceEndTime; 
     const targetDate = new Date();
-    
     const targetHour = Math.floor(endMinutesTotal / 60);
     const targetMin = endMinutesTotal % 60;
-    
-    targetDate.setHours(targetHour, targetMin, 0, 0); // ตั้งเวลาจบของวันนี้
+    targetDate.setHours(targetHour, targetMin, 0, 0);
 
-    // 2. หาผลต่างเวลา (Milliseconds)
     const now = new Date();
     const diff = targetDate - now;
 
-    // 3. เช็คว่าหมดเวลาหรือยัง
     if (diff <= 0) {
         if (timerInterval) clearInterval(timerInterval);
+        document.getElementById('timerDisplay').innerText = "00:00:00";
+        document.getElementById('timerDisplay').classList.add('text-danger', 'fw-bold');
         
-        const display = document.getElementById('timerDisplay');
-        if (display) {
-            display.innerText = "00:00:00";
-            display.classList.add('text-danger', 'fw-bold');
-        }
-        
+        // 🚨 หมดเวลา -> ถามต่อเวลา
         setTimeout(() => {
-            alert("⏰ หมดเวลาใช้งานในรอบนี้แล้ว ระบบจะทำการ Check-out");
-            doCheckout(true); 
-        }, 100);
+            handleTimeUp();
+        }, 500);
         return;
     }
 
-    // 4. แปลงเป็น ชั่วโมง:นาที:วินาที
-    const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-    const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-
     const timerDisplay = document.getElementById('timerDisplay');
     if (timerDisplay) {
-        // แสดงผล
-        timerDisplay.innerText = `เหลือเวลา ${h}:${m}:${s}`;
+        timerDisplay.innerText = formatTime(diff);
 
-        // 5. แจ้งเตือนช่วงโค้งสุดท้าย (น้อยกว่า 5 นาที)
+        // เตือนช่วง 5 นาทีสุดท้าย
         if (diff < 5 * 60 * 1000) { 
-            timerDisplay.style.color = '#dc3545'; // สีแดง
-            // ทำให้กระพริบถ้าน้อยกว่า 1 นาที
+            timerDisplay.style.color = '#dc3545'; 
+            showAlert('ใกล้หมดเวลาแล้ว! กรุณาเตรียมตัวบันทึกงาน หรือกด "ขอต่อเวลา"');
+            
+            // กระพริบถ้าน้อยกว่า 1 นาที
             if (diff < 60 * 1000) {
                 timerDisplay.style.opacity = (new Date().getMilliseconds() < 500) ? '1' : '0.5';
             }
         } else {
-            timerDisplay.style.color = ''; // สีปกติ
+            timerDisplay.style.color = ''; 
+            timerDisplay.style.opacity = '1';
+            hideAlert();
         }
     }
 }
 
-// --- ฟังก์ชัน Check-out ---
-function doCheckout(isAuto = false) {
-    if (!isAuto && !confirm('คุณต้องการเลิกใช้งานและออกจากระบบใช่หรือไม่?')) {
+// ✅✅✅ ฟังก์ชัน Sync ข้อมูลกับ Admin (สำคัญ!) ✅✅✅
+function syncWithAdminUpdates() {
+    const session = DB.getSession(); 
+    if (!session || !session.pcId) return;
+
+    // อ่านข้อมูลล่าสุดจาก DB
+    const pcs = DB.getPCs();
+    const pc = pcs.find(p => String(p.id) === String(session.pcId));
+
+    if (pc) {
+        // กรณี 1: โดน Force Logout หรือสถานะเปลี่ยน
+        if (pc.status !== 'in_use' || pc.currentUser !== session.user.name) {
+            alert("⚠️ Admin ได้ทำการรีเซ็ตเครื่องหรือเช็คเอาท์ให้คุณแล้ว");
+            DB.clearSession();
+            window.location.href = 'index.html';
+            return;
+        }
+
+        // กรณี 2: Admin ต่อเวลาให้ (forceEndTime เปลี่ยน)
+        // (เช็คเฉพาะถ้ามีค่าทั้งคู่ และไม่เท่ากัน)
+        if (pc.forceEndTime && session.forceEndTime && pc.forceEndTime !== session.forceEndTime) {
+            console.log("Time updated by Admin!");
+            
+            // อัปเดต Session ฝั่ง User ให้ตรงกับ DB
+            session.forceEndTime = pc.forceEndTime;
+            DB.setSession(session);
+
+            // รีเซ็ตหน้าจอ
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateCountdownSlot, 1000);
+            updateCountdownSlot(); 
+            
+            // แจ้งเตือนเล็กน้อย (Optional)
+            hideAlert();
+            // alert("Admin ได้ปรับปรุงเวลาใช้งานให้คุณแล้ว");
+        }
+    }
+}
+
+// ✅✅✅ ฟังก์ชันขอต่อเวลา (User กดเอง) ✅✅✅
+function tryExtendSession() {
+    const session = DB.getSession();
+    if (!session || !session.forceEndTime) {
+        alert("ไม่สามารถต่อเวลาได้ในโหมดนี้");
         return;
     }
+
+    const currentEndTime = session.forceEndTime; 
     
+    // 1. หารอบถัดไป
+    const allSlots = DB.getAiTimeSlots ? DB.getAiTimeSlots() : [];
+    const activeSlots = allSlots.filter(s => s.active);
+    
+    const endH = Math.floor(currentEndTime / 60).toString().padStart(2, '0');
+    const endM = (currentEndTime % 60).toString().padStart(2, '0');
+    const timeString = `${endH}:${endM}`;
+
+    const nextSlot = activeSlots.find(s => s.start === timeString);
+
+    if (!nextSlot) {
+        alert("⛔ ไม่สามารถต่อเวลาได้: ไม่มีรอบให้บริการถัดไป หรือห้องปิดแล้ว");
+        return;
+    }
+
+    // 2. เช็ค Booking ชนไหม
+    const bookings = DB.getBookings();
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    
+    const conflict = bookings.find(b => 
+        String(b.pcId) === String(session.pcId) &&
+        b.date === todayStr &&
+        ['approved', 'pending'].includes(b.status) &&
+        b.startTime === nextSlot.start 
+    );
+
+    if (conflict) {
+        alert(`⛔ ไม่สามารถต่อเวลาได้: มีการจองโดยคุณ ${conflict.userName} ในรอบถัดไป (${nextSlot.start} - ${nextSlot.end})`);
+        return;
+    }
+
+    // 3. ยืนยันและบันทึก
+    if(confirm(`✅ รอบถัดไปว่าง (${nextSlot.start} - ${nextSlot.end})\nคุณต้องการต่อเวลาใช้งานหรือไม่?`)) {
+        
+        const [nextEh, nextEm] = nextSlot.end.split(':').map(Number);
+        const newForceEndTime = nextEh * 60 + nextEm;
+
+        // อัปเดต Session
+        session.forceEndTime = newForceEndTime;
+        session.slotId = nextSlot.id;
+        DB.setSession(session);
+
+        // อัปเดต DB
+        DB.updatePCStatus(session.pcId, 'in_use', session.user.name, { forceEndTime: newForceEndTime });
+
+        // Log
+        DB.saveLog({
+            action: 'EXTEND_SESSION',
+            userId: session.user.id,
+            userName: session.user.name,
+            pcId: session.pcId,
+            details: `User Extended to slot: ${nextSlot.start}-${nextSlot.end}`
+        });
+
+        alert("🎉 ต่อเวลาสำเร็จ! ใช้งานได้จนถึง " + nextSlot.end);
+        
+        // Reset Timer
+        hideAlert();
+        document.getElementById('timerDisplay').style.color = '';
+        document.getElementById('timerDisplay').style.opacity = '1';
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(updateCountdownSlot, 1000);
+        updateCountdownSlot();
+    }
+}
+
+// ฟังก์ชันเมื่อเวลาหมด
+function handleTimeUp() {
+    if(confirm("⏰ หมดเวลาการใช้งานในรอบนี้แล้ว\n\nกด 'OK' เพื่อขอต่อเวลา (ถ้าว่าง)\nกด 'Cancel' เพื่อเลิกใช้งาน")) {
+        tryExtendSession();
+    } else {
+        doCheckout(true);
+    }
+}
+
+// --- Helpers ---
+function formatTime(ms) {
+    const h = Math.floor(ms / 3600000).toString().padStart(2, '0');
+    const m = Math.floor((ms % 3600000) / 60000).toString().padStart(2, '0');
+    const s = Math.floor((ms % 60000) / 1000).toString().padStart(2, '0');
+    return `${h}:${m}:${s}`;
+}
+
+function showAlert(msg) {
+    const box = document.getElementById('alertBox');
+    const txt = document.getElementById('alertMsg');
+    if(box && txt) {
+        box.classList.remove('d-none');
+        txt.innerText = msg;
+    }
+}
+
+function hideAlert() {
+    const box = document.getElementById('alertBox');
+    if(box) box.classList.add('d-none');
+}
+
+function doCheckout(isAuto = false) {
+    if (!isAuto && !confirm('คุณต้องการเลิกใช้งานและออกจากระบบใช่หรือไม่?')) return;
     if (timerInterval) clearInterval(timerInterval);
 
     const session = DB.getSession();
-    if (!session) {
-        window.location.href = 'index.html';
-        return;
-    }
+    if (!session) { window.location.href = 'index.html'; return; }
 
     const endTime = Date.now();
     const durationMilliseconds = endTime - session.startTime;
@@ -139,18 +269,14 @@ function doCheckout(isAuto = false) {
     session.durationMinutes = durationMinutes; 
     DB.setSession(session);
     
+    // เปลี่ยนไปหน้า Feedback
     window.location.href = 'feedback.html';
 }
 
-// --- ฟังก์ชัน Force Logout ---
 function forceLogout() {
     if (timerInterval) clearInterval(timerInterval);
-
     const session = DB.getSession(); 
-    if (!session) {
-        window.location.href = 'index.html';
-        return;
-    }
+    if (!session) { window.location.href = 'index.html'; return; }
     
     DB.saveLog({
         action: 'Force Check-out',
@@ -160,7 +286,6 @@ function forceLogout() {
         startTime: new Date(session.startTime).toISOString(),
         timestamp: new Date().toISOString(),
         durationMinutes: 0, 
-        usedSoftware: session.software || [], // บันทึก software ที่เลือกตอนแรก
         satisfactionScore: 'N/A',
     });
 

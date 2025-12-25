@@ -13,7 +13,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Render Table
     renderBookings();
+    
+    // 4. Init Form Options (โหลด PC และ Time Slots ลง Select)
+    initFormOptions();
 });
+
+// ==========================================
+// 0. INIT FORM OPTIONS (ส่วนที่เพิ่มใหม่)
+// ==========================================
+function initFormOptions() {
+    // 1.1 Load PCs into Modal Select
+    const pcSelect = document.getElementById('inputPcId');
+    if (pcSelect) {
+        const pcs = DB.getPCs();
+        // เรียงตามชื่อเครื่อง
+        pcs.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+        
+        pcSelect.innerHTML = '<option value="">-- เลือกเครื่อง --</option>';
+        pcs.forEach(pc => {
+            const statusText = pc.status === 'maintenance' ? '(ปิดปรับปรุง)' : '';
+            const disableAttr = pc.status === 'maintenance' ? 'disabled' : '';
+            pcSelect.innerHTML += `<option value="${pc.id}" ${disableAttr}>${pc.name} ${statusText}</option>`;
+        });
+    }
+
+    // 1.2 Load Time Slots (Dynamic from DB)
+    const timeSelect = document.getElementById('inputTimeSlot');
+    if (timeSelect) {
+        // ใช้ฟังก์ชัน getAiTimeSlots จาก mock-db.js
+        const slots = (DB.getAiTimeSlots && typeof DB.getAiTimeSlots === 'function') 
+                      ? DB.getAiTimeSlots() 
+                      : [];
+        
+        const activeSlots = slots.filter(s => s.active);
+        
+        timeSelect.innerHTML = '<option value="">-- เลือกรอบเวลา --</option>';
+        
+        if (activeSlots.length > 0) {
+            activeSlots.forEach(s => {
+                const label = s.label || `${s.start} - ${s.end}`;
+                // value เก็บเป็น JSON string เพื่อให้ตอน save แกะค่า start/end ได้ง่าย
+                timeSelect.innerHTML += `<option value='${JSON.stringify({start: s.start, end: s.end})}'>${label}</option>`;
+            });
+        } else {
+            timeSelect.innerHTML += `<option value="" disabled>ไม่มีรอบเวลาที่เปิดใช้งาน</option>`;
+        }
+    }
+}
 
 // ==========================================
 // 1. RENDER TABLE
@@ -119,237 +165,88 @@ function updateStatus(id, newStatus) {
 // ==========================================
 
 function openBookingModal() {
-    initSoftwareFilter();
-    renderPCOptions(DB.getPCs());
-
-    const now = new Date();
-    document.getElementById('bkUser').value = '';
-    document.getElementById('bkDate').value = now.toISOString().split('T')[0];
+    // Reset Form
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('inputDate').value = today;
+    document.getElementById('inputPcId').value = '';
+    document.getElementById('inputTimeSlot').value = ''; // Reset Time Slot
+    document.getElementById('inputUserId').value = '';
+    document.getElementById('inputUserName').value = '';
+    document.getElementById('inputNote').value = '';
     
-    // ✅✅✅ แก้ไข: ดึงรอบเวลาจาก DB (Dynamic) ✅✅✅
-    const slotSelect = document.getElementById('bkTimeSlot');
-    slotSelect.innerHTML = ''; // ล้างค่าเดิม
-    
-    // ใช้ฟังก์ชัน getAiTimeSlots จาก mock-db.js
-    const allSlots = (DB.getAiTimeSlots && typeof DB.getAiTimeSlots === 'function') 
-                     ? DB.getAiTimeSlots() 
-                     : [];
-    
-    // กรองเฉพาะรอบที่ Active (เปิดใช้งาน)
-    const activeSlots = allSlots.filter(s => s.active);
-
-    if (activeSlots.length > 0) {
-        activeSlots.forEach(slot => {
-            const option = document.createElement('option');
-            option.value = `${slot.start}-${slot.end}`;
-            option.text = slot.label || `${slot.start} - ${slot.end}`;
-            slotSelect.appendChild(option);
-        });
-    } else {
-        // กรณีปิดทุกรอบ
-        slotSelect.innerHTML = '<option value="" disabled selected>⛔ ปิดให้บริการชั่วคราว (ไม่มีรอบเวลา)</option>';
-    }
-    // ✅✅✅ จบส่วนแก้ไข ✅✅✅
-
-    document.getElementById('bkTypeSelect').value = 'General';
-    document.getElementById('bkSoftwareFilter').value = '';
-    
-    toggleSoftwareList();
     if(bookingModal) bookingModal.show();
 }
 
-function initSoftwareFilter() {
-    const filterSelect = document.getElementById('bkSoftwareFilter');
-    const lib = DB.getSoftwareLib(); 
-    filterSelect.innerHTML = '<option value="">🔍 ค้นหาจาก Software/AI...</option>';
-    lib.forEach(item => {
-        const fullName = `${item.name} (${item.version})`;
-        const option = document.createElement('option');
-        option.value = fullName;
-        option.text = item.type === 'AI' ? `🤖 ${fullName}` : `💻 ${fullName}`;
-        filterSelect.appendChild(option);
-    });
-}
-
-function filterPCList() {
-    const filterVal = document.getElementById('bkSoftwareFilter').value;
-    const allPcs = DB.getPCs();
-    
-    let filteredPcs = allPcs;
-    if (filterVal) {
-        filteredPcs = allPcs.filter(pc => 
-            pc.installedSoftware && 
-            pc.installedSoftware.some(sw => sw === filterVal)
-        );
-    }
-    
-    renderPCOptions(filteredPcs);
-    
-    if (filterVal) {
-        document.getElementById('bkTypeSelect').value = 'AI';
-        toggleSoftwareList();
-
-        if (filteredPcs.length > 0) {
-            const select = document.getElementById('bkPcSelect');
-            const bestChoice = filteredPcs.find(p => p.status === 'available');
-            
-            if (bestChoice) {
-                select.value = bestChoice.id; 
-            } else {
-                select.value = filteredPcs[0].id; 
-            }
-            updateSoftwareList();
-        }
-    }
-}
-
-function renderPCOptions(pcs) {
-    const select = document.getElementById('bkPcSelect');
-    select.innerHTML = '<option value="">-- กรุณาเลือกเครื่อง --</option>';
-    
-    if (pcs.length === 0) {
-        const option = document.createElement('option');
-        option.text = "-- ไม่พบเครื่องที่รองรับ --";
-        option.disabled = true;
-        select.appendChild(option);
-        return;
-    }
-
-    pcs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-
-    pcs.forEach(pc => {
-        const option = document.createElement('option');
-        option.value = pc.id;
-        option.text = `${pc.name} (${pc.status})`;
-        if (pc.status === 'maintenance') option.disabled = true;
-        select.appendChild(option);
-    });
-}
-
-function updateSoftwareList() {
-    const pcId = document.getElementById('bkPcSelect').value;
-    const container = document.getElementById('aiCheckboxList');
-    container.innerHTML = '';
-    
-    if (!pcId) {
-        container.innerHTML = '<span class="text-muted small fst-italic">กรุณาเลือกเครื่องก่อน...</span>';
-        return;
-    }
-
-    const pc = DB.getPCs().find(p => String(p.id) === String(pcId));
-    if (!pc || !pc.installedSoftware || pc.installedSoftware.length === 0) {
-        container.innerHTML = '<span class="text-muted small">เครื่องนี้ไม่มีรายการ Software/AI ติดตั้ง</span>';
-        return;
-    }
-
-    const filterVal = document.getElementById('bkSoftwareFilter').value;
-
-    pc.installedSoftware.forEach((sw, index) => {
-        const isChecked = (sw === filterVal) ? 'checked' : ''; 
-
-        const html = `
-            <div class="col-6">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="aiSelect" value="${sw}" id="sw_${index}" ${isChecked}>
-                    <label class="form-check-label small" for="sw_${index}">${sw}</label>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', html);
-    });
-}
-
-function toggleSoftwareList() {
-    const typeSelect = document.getElementById('bkTypeSelect');
-    const isAI = typeSelect && typeSelect.value === 'AI';
-    const box = document.getElementById('aiSelectionBox');
-    
-    if (box) {
-        if (isAI) {
-            box.classList.remove('d-none');
-            updateSoftwareList(); 
-        } else {
-            box.classList.add('d-none');
-        }
-    }
-}
-
-// ==========================================
-// 3. SAVE BOOKING
-// ==========================================
 function saveBooking() {
-    const pcId = document.getElementById('bkPcSelect').value;
-    const date = document.getElementById('bkDate').value;
-    const inputUser = document.getElementById('bkUser').value.trim(); 
-    
-    const timeSlotVal = document.getElementById('bkTimeSlot').value;
-    if (!timeSlotVal) {
-        alert("กรุณาเลือกรอบเวลา (หากไม่มีรอบเวลา แสดงว่าปิดให้บริการช่วงนี้)");
-        return;
-    }
-    const [start, end] = timeSlotVal.split('-'); 
-    
-    const type = document.getElementById('bkTypeSelect').value;
+    const pcId = document.getElementById('inputPcId').value;
+    const date = document.getElementById('inputDate').value; // yyyy-mm-dd
+    const timeSlotJson = document.getElementById('inputTimeSlot').value;
+    const userId = document.getElementById('inputUserId').value.trim();
+    const userName = document.getElementById('inputUserName').value.trim();
+    const note = document.getElementById('inputNote').value.trim();
 
-    if (!inputUser || !date || !pcId || !start) {
+    if (!pcId || !date || !timeSlotJson || !userName) {
         alert("กรุณากรอกข้อมูลให้ครบถ้วน");
         return;
     }
 
-    let finalUserName = inputUser;
-    let finalUserId = inputUser;
-    const regData = DB.checkRegAPI(inputUser);
-    if (regData) finalUserName = regData.prefix + regData.name;
-
-    const bookings = DB.getBookings();
-    
-    // เช็คคิวชน (รวมทั้ง approved, pending, completed)
-    const conflict = bookings.find(b => {
-        return String(b.pcId) === String(pcId) && 
-               b.date === date && 
-               ['approved', 'in_use'].includes(b.status) && // ✅ เช็คเฉพาะสถานะที่กินที่
-               (start < b.endTime && end > b.startTime);
-    });
-
-    if (conflict) {
-        alert(`❌ จองไม่ได้! ช่วงเวลาชนกับคุณ ${conflict.userName}`);
+    // แกะ Time Slot จาก JSON Value
+    let slot;
+    try {
+        slot = JSON.parse(timeSlotJson);
+    } catch (e) {
+        alert("เกิดข้อผิดพลาดในการอ่านค่าเวลา");
         return;
-    }
-
-    let selectedSoftware = [];
-    if (type === 'AI') {
-        const checkboxes = document.querySelectorAll('input[name="aiSelect"]:checked');
-        selectedSoftware = Array.from(checkboxes).map(cb => cb.value);
     }
 
     const pcs = DB.getPCs();
     const pc = pcs.find(p => String(p.id) === String(pcId));
 
+    // เช็คซ้ำ (Conflict Check)
+    const bookings = DB.getBookings();
+    const isDup = bookings.some(b => 
+        b.date === date && b.pcId === pcId && 
+        ['approved', 'in_use'].includes(b.status) &&
+        ((slot.start >= b.startTime && slot.start < b.endTime) || (slot.end > b.startTime && slot.end <= b.endTime))
+    );
+
+    if (isDup) {
+        alert("⚠️ ช่วงเวลานี้มีการจองอยู่แล้ว กรุณาเลือกเครื่องอื่นหรือเวลาอื่น");
+        return;
+    }
+
     const newBooking = {
-        id: 'b' + Date.now(),
-        userId: finalUserId,   
-        userName: finalUserName,
+        id: 'b_admin_' + Date.now(),
+        userId: userId || 'Guest',
+        userName: userName,
         pcId: pcId,
         pcName: pc ? pc.name : 'Unknown',
         date: date,
-        startTime: start,
-        endTime: end,
-        type: type,
-        softwareList: selectedSoftware, 
-        // ✅ บันทึกเป็น 'approved' ทันทีเมื่อ Admin จองเอง
-        status: 'approved'
+        startTime: slot.start,
+        endTime: slot.end,
+        note: note,
+        status: 'approved', // จองโดย Admin ให้ Approve เลย
+        type: 'General' // Default type
     };
 
     bookings.push(newBooking);
     DB.saveBookings(bookings);
-
-    alert(`✅ บันทึกการจองสำเร็จ\nผู้จอง: ${finalUserName}\nเครื่อง: ${pc.name}`);
+    
+    alert(`✅ บันทึกการจองสำเร็จ`);
     if(bookingModal) bookingModal.hide();
     renderBookings();
 }
 
+function deleteBooking(id) {
+    if(!confirm("ยืนยันลบข้อมูลการจองนี้?")) return;
+    let bookings = DB.getBookings();
+    bookings = bookings.filter(b => b.id !== id);
+    DB.saveBookings(bookings);
+    renderBookings();
+}
+
 // ==========================================
-// 4. IMPORT CSV LOGIC (Custom Format)
+// 3. IMPORT CSV LOGIC (Fixed)
 // ==========================================
 
 function handleImport(input) {
@@ -365,7 +262,7 @@ function handleImport(input) {
 }
 
 function processCSVData(csvText) {
-    // 1. ดึงวันที่จากตัวกรองหน้าเว็บมาใช้
+    // 1. ดึงวันที่จากตัวกรองหน้าเว็บมาใช้ (Import ลงวันที่ที่เลือก)
     const selectedDate = document.getElementById('bookingDateFilter').value;
     if (!selectedDate) {
         alert("❌ กรุณาเลือก 'วันที่' ในหน้าเว็บก่อน Import ไฟล์");
@@ -381,15 +278,15 @@ function processCSVData(csvText) {
         return;
     }
 
-    const bookings = DB.getBookings(); //
-    const pcs = DB.getPCs(); //
+    const bookings = DB.getBookings();
+    const pcs = DB.getPCs();
     let successCount = 0;
     let failCount = 0;
     let errorLog = [];
 
     dataLines.forEach((line, index) => {
-        // Format: Time, User, PC, Note, Status
-        // ตัวอย่าง: 09:00-10:30, สมชาย, PC-01, ChatGPT, approved
+        // Format Expected: Time, User, PC, Note, Status
+        // Example: 09:00-10:30, สมชาย, PC-01, ChatGPT, approved
         
         const cols = line.split(',');
         if (cols.length < 5) {
@@ -411,7 +308,6 @@ function processCSVData(csvText) {
         const endTime = times[1].trim();
 
         // B. จัดการ PC -> หา ID จากชื่อเครื่อง
-        // รองรับทั้งเขียนว่า "PC-01" หรือเลข "1" เฉยๆ
         const cleanPcName = pcNameRaw.toUpperCase().replace('PC-', ''); 
         const pc = pcs.find(p => String(p.id) === cleanPcName || p.name === pcNameRaw);
         
@@ -421,17 +317,15 @@ function processCSVData(csvText) {
             return;
         }
 
-        // C. จัดการ Note / Software -> แปลงเป็น Array
-        // ถ้า Note เป็น "General" หรือว่าง ให้เป็น List ว่าง
+        // C. จัดการ Note / Software
         let softwareList = [];
         let type = 'General';
         if (noteRaw && noteRaw.toLowerCase() !== 'general') {
-            softwareList = noteRaw.split(';').map(s => s.trim()); // รองรับหลายตัวคั่นด้วย ;
-            type = 'AI'; // สมมติว่าเป็น AI ถ้ามีการระบุ Note
+            softwareList = noteRaw.split(';').map(s => s.trim());
+            type = 'AI';
         }
 
         // D. ตรวจสอบสถานะ (Status)
-        // ถ้าไม่ระบุ หรือระบุผิด ให้เป็น 'approved' ไว้ก่อน
         const validStatuses = ['pending', 'approved', 'completed', 'no_show', 'rejected'];
         let status = statusRaw.toLowerCase();
         if (!validStatuses.includes(status)) status = 'approved';
@@ -439,7 +333,7 @@ function processCSVData(csvText) {
         // E. สร้าง Object การจอง
         const newBooking = {
             id: 'b_imp_' + Date.now() + Math.random().toString(36).substr(2, 5),
-            userId: userRaw,   // ใช้ชื่อเป็น ID ไปเลยสำหรับการ Import ง่ายๆ
+            userId: userRaw,   // ใช้ชื่อเป็น ID ชั่วคราว
             userName: userRaw,
             pcId: pc.id,
             pcName: pc.name,
@@ -471,8 +365,8 @@ function processCSVData(csvText) {
 
     // บันทึกและรีเฟรช
     if (successCount > 0) {
-        DB.saveBookings(bookings); //
-        renderBookings(); //
+        DB.saveBookings(bookings);
+        renderBookings();
         alert(`✅ นำเข้าข้อมูลวันที่ ${selectedDate} เรียบร้อย!\nสำเร็จ: ${successCount}\nล้มเหลว: ${failCount}`);
     } else {
         alert(`❌ นำเข้าล้มเหลวทั้งหมด\n\n${errorLog.join('\n')}`);

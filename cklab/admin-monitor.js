@@ -4,7 +4,7 @@
 // ⚙️ Global Constants & Variables
 // ==========================================
 
-let checkInModal;
+let checkInModal, manageActiveModal; // เพิ่ม manageActiveModal
 let currentTab = 'internal';
 let verifiedUserData = null;
 let currentFilter = 'all'; 
@@ -13,9 +13,11 @@ let searchQuery = '';
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Init Modal
     const modalEl = document.getElementById('checkInModal');
-    if (modalEl) {
-        checkInModal = new bootstrap.Modal(modalEl);
-    }
+    if (modalEl) checkInModal = new bootstrap.Modal(modalEl);
+    
+    // ✅ Init Modal ใหม่ (จัดการเครื่องที่กำลังใช้งาน)
+    const manageEl = document.getElementById('manageActiveModal');
+    if (manageEl) manageActiveModal = new bootstrap.Modal(manageEl);
 
     // 2. เริ่มทำงาน
     renderMonitor();
@@ -24,10 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Auto Refresh Monitoring (ทุก 2 วินาที)
     setInterval(() => {
-        // อัปเดตหน้าจอเฉพาะตอนที่ไม่ได้เปิด Modal อยู่ (ป้องกันข้อมูลเปลี่ยนตอนกำลังกรอก)
-        if (modalEl && !modalEl.classList.contains('show')) {
-            renderMonitor();
-        }
+        // อัปเดตหน้าจอเฉพาะตอนที่ไม่ได้เปิด Modal อยู่
+        const isModalOpen = (modalEl && modalEl.classList.contains('show')) || (manageEl && manageEl.classList.contains('show'));
+        if (!isModalOpen) renderMonitor();
     }, 2000); 
     
     // นาฬิกาและระบบเช็คคิวจอง
@@ -42,7 +43,7 @@ function updateClock() {
 }
 
 // ==========================================
-// 🔄 Auto Booking Switcher (ระบบจัดการคิวจองอัตโนมัติ)
+// 🔄 Auto Booking Switcher (อัปเกรด: ตัด No-Show ลง DB)
 // ==========================================
 function checkAndSwitchBookingQueue() {
     const pcs = DB.getPCs();
@@ -63,18 +64,24 @@ function checkAndSwitchBookingQueue() {
             b.status === 'approved'
         );
 
-        // หา Booking ที่ Active ตอนนี้ (รวมเวลา Buffer ก่อนเริ่ม 15 นาที)
+        // หา Booking ที่ Active ตอนนี้
         const activeBooking = myBookings.find(b => {
             const [sh, sm] = b.startTime.split(':').map(Number);
             const [eh, em] = b.endTime.split(':').map(Number);
             const start = sh * 60 + sm;
             const end = eh * 60 + em;
 
-            // Logic No-Show: ถ้าเลยเวลาเริ่มไป 15 นาทีแล้ว ยังไม่ Check-in -> ปล่อยผ่าน (ไม่จอง)
-            if (currentMinutes > (start + 15) && b.status === 'approved') {
-                return false; 
+            // ✅✅✅ Logic ใหม่: ตัด No-Show ลง Database ✅✅✅
+            // ถ้าเลยเวลาเริ่มไป 15 นาทีแล้ว ยังสถานะ approved (แปลว่ายังไม่ Check-in)
+            if (currentMinutes > (start + 15)) {
+                console.log(`Auto No-Show: ${b.userName} @ ${b.startTime}`);
+                // อัปเดตลง DB ทันที
+                DB.updateBookingStatus(b.id, 'no_show'); 
+                hasChanges = true; 
+                return false; // จบข่าว ถือว่ารายการนี้ไม่มีผลแล้ว
             }
 
+            // ถ้ายังอยู่ในช่วงเวลา (รวม Buffer ก่อนเริ่ม 15 นาที)
             return currentMinutes >= (start - 15) && currentMinutes < end;
         });
 
@@ -93,7 +100,9 @@ function checkAndSwitchBookingQueue() {
         }
     });
 
-    if (hasChanges) renderMonitor();
+    if (hasChanges) {
+        renderMonitor();
+    }
 }
 
 // ==========================================
@@ -125,7 +134,6 @@ function updateMonitorStats(allPcs) {
         const el = document.getElementById(id);
         if(el) {
             el.innerText = val;
-            // Animation เล็กน้อยเมื่อตัวเลขเปลี่ยน
             el.style.transition = 'transform 0.2s';
             el.style.transform = 'scale(1.2)';
             setTimeout(() => el.style.transform = 'scale(1)', 200);
@@ -148,11 +156,9 @@ function renderMonitor() {
     const todayStr = new Date().toISOString().split('T')[0]; 
 
     let displayPcs = allPcs;
-    // กรองตามปุ่มสถานะ
     if (currentFilter !== 'all') {
         displayPcs = displayPcs.filter(pc => pc.status === currentFilter);
     }
-    // กรองตามช่องค้นหา
     if (searchQuery) {
         displayPcs = displayPcs.filter(pc => 
             pc.name.toLowerCase().includes(searchQuery) || 
@@ -180,18 +186,17 @@ function renderMonitor() {
             `<div class="mt-2 small text-dark fw-bold text-truncate" title="${pc.currentUser}"><i class="bi bi-person-fill"></i> ${pc.currentUser}</div>` : 
             `<div class="mt-2 small text-muted">-</div>`;
 
-        // 1. ตรวจสอบข้อมูลการจอง (สำหรับแสดงใน Badge)
+        // 1. ตรวจสอบข้อมูลการจอง
         let activeBooking = bookings.find(b => 
             String(b.pcId) === String(pc.id) && b.date === todayStr && b.status === 'approved' &&
             (pc.currentUser ? b.userName === pc.currentUser : true)
         );
 
-        // 2. แสดงข้อมูลรอบเวลา (Slot Info)
+        // 2. แสดงข้อมูลรอบเวลา
         let timeSlotInfo = activeBooking ? 
             `<div class="badge bg-warning text-dark mt-1 border"><i class="bi bi-calendar-check"></i> ${activeBooking.startTime} - ${activeBooking.endTime}</div>` : 
             `<div class="mt-1" style="height: 21px;"></div>`;
 
-        // ถ้ากำลังใช้งานอยู่ ให้ลองเทียบกับรอบเวลา (Slots) ที่ตั้งไว้
         if (pc.status === 'in_use') {
             const now = new Date();
             const cur = now.getHours() * 60 + now.getMinutes();
@@ -199,7 +204,6 @@ function renderMonitor() {
             const activeSlots = allSlots.filter(s => s.active);
 
             if (activeSlots.length > 0) {
-                // หารอบที่ตรงกับเวลาปัจจุบัน
                 const activeSlot = activeSlots.find(s => {
                     const [sh, sm] = s.start.split(':').map(Number);
                     const [eh, em] = s.end.split(':').map(Number);
@@ -215,7 +219,7 @@ function renderMonitor() {
             }
         }
 
-        // 3. แสดงระยะเวลาที่ใช้ไป (Duration Badge)
+        // 3. แสดงระยะเวลา
         let usageTimeBadge = '';
         if (pc.status === 'in_use' && pc.startTime) {
             const diffMs = Date.now() - new Date(pc.startTime).getTime();
@@ -228,7 +232,7 @@ function renderMonitor() {
             usageTimeBadge = `<div class="mt-1" style="height: 21px;"></div>`; 
         }
 
-        // 4. แสดง Software ที่ติดตั้ง
+        // 4. แสดง Software
         let softwareHtml = '';
         if (Array.isArray(pc.installedSoftware) && pc.installedSoftware.length > 0) {
             softwareHtml = '<div class="mt-2 pt-2 border-top d-flex flex-wrap justify-content-center gap-1">';
@@ -276,11 +280,9 @@ function handlePcClick(pcId) {
     if (pc.status === 'available') {
         openCheckInModal(pc);
     } else if (pc.status === 'in_use') {
-        if(confirm(`⚠️ เครื่อง ${pc.name} กำลังใช้งานโดย ${pc.currentUser}\n\nต้องการ "บังคับ Check-out" (Force Logout) หรือไม่?`)) {
-            performForceCheckout(pc.id);
-        }
+        // ✅ เปลี่ยนจาก confirm ธรรมดา เป็นเปิด Modal จัดการ
+        openManageActiveModal(pc);
     } else if (pc.status === 'reserved') {
-        // กรณีคลิกเครื่องที่ถูกจอง (เพื่อให้เจ้าตัวมายืนยัน)
         if(confirm(`🟡 เครื่อง ${pc.name} ถูกจองโดย ${pc.currentUser}\n\nต้องการ "ยืนยันการเข้าใช้งาน" (Check-in) หรือไม่?`)) {
             const bookings = DB.getBookings();
             const todayStr = new Date().toLocaleDateString('en-CA');
@@ -292,10 +294,7 @@ function handlePcClick(pcId) {
                 DB.updateBookingStatus(validBooking.id, 'completed');
             }
 
-            // ✅ คำนวณ Slot จบ เพื่อให้นับถอยหลังได้ถูกต้อง
             const slotEndTime = getSlotEndTime();
-            
-            // อัปเดตสถานะพร้อมเวลาจบ (forceEndTime)
             DB.updatePCStatus(pc.id, 'in_use', pc.currentUser, { forceEndTime: slotEndTime });
             
             DB.saveLog({
@@ -308,6 +307,93 @@ function handlePcClick(pcId) {
         }
     } else {
         alert(`เครื่องนี้สถานะ ${pc.status} (แจ้งซ่อม) ไม่สามารถใช้งานได้`);
+    }
+}
+
+// ✅✅✅ ฟังก์ชันจัดการ Modal (ใหม่) ✅✅✅
+
+function openManageActiveModal(pc) {
+    document.getElementById('managePcId').value = pc.id;
+    document.getElementById('managePcName').innerText = pc.name;
+    document.getElementById('manageUserName').innerText = pc.currentUser || 'Unknown';
+    
+    // แสดงเวลาจบปัจจุบัน
+    let endTimeText = "ไม่กำหนด (Unlimited)";
+    if (pc.forceEndTime) {
+        const h = Math.floor(pc.forceEndTime / 60).toString().padStart(2, '0');
+        const m = (pc.forceEndTime % 60).toString().padStart(2, '0');
+        endTimeText = `${h}:${m}`;
+    }
+    document.getElementById('manageEndTime').innerText = endTimeText;
+
+    if(manageActiveModal) manageActiveModal.show();
+}
+
+function extendSessionByAdmin() {
+    const pcId = document.getElementById('managePcId').value;
+    const pc = DB.getPCs().find(p => String(p.id) === String(pcId));
+    if (!pc) return;
+
+    // Logic หา Slot ถัดไป
+    const currentEndTime = pc.forceEndTime;
+    if (!currentEndTime) {
+        alert("⚠️ เครื่องนี้ไม่ได้ใช้งานแบบระบุรอบเวลา (Unlimited)\nไม่สามารถต่อเวลารอบได้");
+        return;
+    }
+
+    const allSlots = DB.getAiTimeSlots ? DB.getAiTimeSlots() : [];
+    const activeSlots = allSlots.filter(s => s.active);
+    
+    const endH = Math.floor(currentEndTime / 60).toString().padStart(2, '0');
+    const endM = (currentEndTime % 60).toString().padStart(2, '0');
+    const timeString = `${endH}:${endM}`;
+
+    const nextSlot = activeSlots.find(s => s.start === timeString);
+
+    if (!nextSlot) {
+        alert("⛔ ไม่พบรอบให้บริการถัดไป (หรือจบวันแล้ว)");
+        return;
+    }
+
+    // เช็ค Booking ชนไหม
+    const bookings = DB.getBookings();
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const conflict = bookings.find(b => 
+        String(b.pcId) === String(pcId) &&
+        b.date === todayStr &&
+        ['approved', 'pending'].includes(b.status) &&
+        b.startTime === nextSlot.start 
+    );
+
+    if (conflict) {
+        if(!confirm(`⚠️ มีคิวจองในรอบถัดไป (${nextSlot.start}) โดยคุณ ${conflict.userName}\n\nAdmin ต้องการ "ลัดคิว/ต่อเวลาพิเศษ" ให้ผู้ใช้นี้หรือไม่?`)) {
+            return;
+        }
+    }
+
+    const [nextEh, nextEm] = nextSlot.end.split(':').map(Number);
+    const newForceEndTime = nextEh * 60 + nextEm;
+
+    // อัปเดต DB
+    DB.updatePCStatus(pcId, 'in_use', pc.currentUser, { forceEndTime: newForceEndTime });
+    
+    DB.saveLog({
+        action: 'EXTEND_SESSION',
+        userId: 'Admin', userName: 'Administrator',
+        pcId: pcId,
+        details: `Admin Extended for ${pc.currentUser} to ${nextSlot.end}`
+    });
+
+    alert(`✅ ต่อเวลาสำเร็จ! สิ้นสุดเวลา ${nextSlot.end}`);
+    if(manageActiveModal) manageActiveModal.hide();
+    renderMonitor();
+}
+
+function confirmForceLogout() {
+    const pcId = document.getElementById('managePcId').value;
+    if(confirm('ยืนยันบังคับให้ออก (Force Logout)?')) {
+        performForceCheckout(pcId);
+        if(manageActiveModal) manageActiveModal.hide();
     }
 }
 
@@ -475,6 +561,7 @@ function confirmCheckIn() {
     const pcId = document.getElementById('checkInPcId').value;
     let finalName = "", userType = "", finalId = "", faculty = "";
 
+    // ... (ส่วนดึงข้อมูล User เหมือนเดิม) ...
     if (currentTab === 'internal') {
         if (!verifiedUserData) return;
         finalName = verifiedUserData.name; 
@@ -482,52 +569,56 @@ function confirmCheckIn() {
         finalId = verifiedUserData.id;
         faculty = verifiedUserData.faculty;
     } else {
+        // ... (ส่วน External เหมือนเดิม) ...
         const extName = document.getElementById('extName').value.trim();
         const extOrg = document.getElementById('extOrg').value.trim();
         const extId = document.getElementById('extIdCard').value.trim();
         if (!extName) { alert('กรุณากรอกชื่อ-นามสกุล'); return; }
-        
         finalName = extName + (extOrg ? ` (${extOrg})` : ''); 
         userType = 'Guest'; 
         finalId = extId || 'External';
         faculty = extOrg || 'บุคคลภายนอก';
     }
 
-    const usageType = document.querySelector('input[name="usageType"]:checked').value;
+    // ✅✅✅ ส่วน Logic ใหม่ (Auto-Detect Booking) ✅✅✅
+    
+    const bookings = DB.getBookings(); 
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    if (usageType === 'booking') {
-        const bookings = DB.getBookings(); 
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        const now = new Date();
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    // 1. ค้นหาว่า User คนนี้ จองเครื่องนี้ ไว้ในวันนี้หรือไม่?
+    const validBooking = bookings.find(b => 
+        String(b.pcId) === String(pcId) &&
+        b.date === todayStr &&
+        b.status === 'approved' &&
+        b.userName === finalName // เช็คชื่อตรงกัน
+    );
 
-        const validBooking = bookings.find(b => 
-            String(b.pcId) === String(pcId) &&
-            b.date === todayStr &&
-            b.status === 'approved' &&
-            b.userName === finalName
-        );
+    let usageDetail = 'Walk-in User'; // ค่าเริ่มต้นคือ Walk-in
 
-        if (!validBooking) {
-            alert(`⚠️ ไม่พบข้อมูลการจอง!\n\nคุณ ${finalName} ไม่ได้จองเครื่อง PC-${pcId} ไว้ในวันนี้\nกรุณาเลือกรูปแบบ "Walk-in" แทนครับ`);
-            return; 
-        }
-
+    if (validBooking) {
+        // ถ้าเจอการจอง -> เช็คเวลาว่าถึงเวลาหรือยัง (ให้เข้าก่อนได้ 15 นาที)
         const [startH, startM] = validBooking.startTime.split(':').map(Number);
         const bookingStartMins = startH * 60 + startM;
-        
-        if (currentMinutes < (bookingStartMins - 15)) {
-            alert(`⚠️ ยังไม่ถึงเวลาจอง!\n\nคิวจองของคุณคือ ${validBooking.startTime} - ${validBooking.endTime}\nกรุณารอสักครู่`);
-            return;
-        }
 
-        DB.updateBookingStatus(validBooking.id, 'completed');
+        if (currentMinutes < (bookingStartMins - 15)) {
+            // ถ้ามาเร็วเกินไป -> เตือน!
+            alert(`⚠️ ยังไม่ถึงเวลาจอง!\n\nคิวจองของคุณคือ ${validBooking.startTime} - ${validBooking.endTime}\nกรุณารอสักครู่ หรือเข้าใช้งานแบบ Walk-in (หากเครื่องว่าง)`);
+            // ตรงนี้แล้วแต่คุณว่าจะ return; เพื่อห้ามเข้า หรือจะปล่อยให้เป็น Walk-in ไปเลย
+            // ถ้าจะปล่อยให้เข้าเป็น Walk-in ก็ไม่ต้องทำอะไร ระบบจะใช้ค่า default
+        } else {
+            // ✅ เวลาถูกต้อง -> นับเป็น Booking Check-in
+            usageDetail = 'Check-in from Booking';
+            // อัปเดตสถานะการจองเป็น Completed (ใช้สิทธิ์แล้ว)
+            DB.updateBookingStatus(validBooking.id, 'completed');
+        }
     }
 
-    // ✅ ใช้ Helper คำนวณเวลาจบ
+    // 2. คำนวณ Slot จบ (ใช้ Logic เดิมที่เคยทำไว้)
     const slotEndTime = getSlotEndTime();
 
-    // ✅ ส่ง forceEndTime ไปบันทึกด้วย (เพื่อให้ timer.js รู้)
+    // 3. บันทึกข้อมูล
     DB.updatePCStatus(pcId, 'in_use', finalName, { forceEndTime: slotEndTime });
     
     DB.saveLog({
@@ -538,7 +629,7 @@ function confirmCheckIn() {
         userFaculty: faculty,
         pcId: pcId,
         startTime: new Date().toISOString(),
-        details: usageType === 'booking' ? 'Check-in from Booking' : 'Walk-in User',
+        details: usageDetail, // ✅ บันทึกอัตโนมัติว่า Walk-in หรือ Booking
         slotId: slotEndTime ? 'Auto-Slot' : null
     });
 
