@@ -81,33 +81,45 @@ function drawDistributionBarChart(data) {
     });
 }
 
-// ✅ ฟังก์ชันวาดกราฟเส้น 2.2 (แสดงข้อมูลครบทุกวันแม้เป็น 0 และปรับดีไซน์ให้เข้ากับกราฟ 2.1)
-function drawDailyTrendLineChart(dailyData) {
+function drawDailyTrendLineChart(dailyData, timeMode) {
     const ctx = document.getElementById('dailyTrendLineChart');
     if (!ctx) return;
     if (dailyTrendLineInstance) dailyTrendLineInstance.destroy();
 
-    // 🛠️ ส่วนที่ 1: เตรียมข้อมูลวันที่ให้ครบตามช่วงที่คัดกรอง (แม้ไม่มีคนใช้ก็ต้องแสดงเป็น 0)
-    const startDateInput = document.getElementById('dateStart').value;
-    const endDateInput = document.getElementById('dateEnd').value;
-    
     let labels = [];
     let dataPoints = [];
 
-    if (startDateInput && endDateInput) {
-        let current = new Date(startDateInput);
-        const end = new Date(endDateInput);
-        
-        while (current <= end) {
-            const dateStr = current.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-            labels.push(dateStr);
-            // ถ้าวันนั้นไม่มีข้อมูลใน dailyData ให้ใส่เป็น 0
-            dataPoints.push(dailyData[dateStr] || 0);
-            current.setDate(current.getDate() + 1);
+    if (timeMode === 'yearly') {
+        labels = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+        dataPoints = labels.map(month => dailyData[month] || 0);
+    } 
+    else if (timeMode === 'daily' || timeMode === 'monthly') {
+        let startD, endD;
+
+        if (timeMode === 'daily') {
+            startD = new Date(document.getElementById('dateStart').value);
+            endD = new Date(document.getElementById('dateEnd').value);
+        } else {
+            // โหมด Monthly: หาตั้งแต่วันที่ 1 ของเดือนเริ่ม จนถึงวันสุดท้ายของเดือนจบ
+            const mStartVal = document.getElementById('monthStart').value;
+            const mEndVal = document.getElementById('monthEnd').value;
+            startD = new Date(mStartVal + "-01");
+            const parts = mEndVal.split('-');
+            endD = new Date(parts[0], parts[1], 0);
         }
-    } else {
-        // กรณีไม่ได้เลือกวันที่ ให้ใช้ข้อมูลที่มีอยู่ตามปกติ
-        labels = Object.keys(dailyData).sort();
+
+        if (startD && endD && !isNaN(startD) && !isNaN(endD)) {
+            let curr = new Date(startD);
+            while (curr <= endD) {
+                const dateStr = curr.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                labels.push(dateStr);
+                dataPoints.push(dailyData[dateStr] || 0);
+                curr.setDate(curr.getDate() + 1);
+            }
+        }
+    } 
+    else {
+        labels = Object.keys(dailyData);
         dataPoints = labels.map(d => dailyData[d]);
     }
 
@@ -116,45 +128,25 @@ function drawDailyTrendLineChart(dailyData) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'ผู้ใช้รวม',
+                label: 'จำนวนครั้งการใช้งาน',
                 data: dataPoints,
-                // 🛠️ ส่วนที่ 2: ปรับดีไซน์ตามรูปตัวอย่างที่ส่งมา
-                borderColor: '#1d73f2',       // สีน้ำเงินโทนเดียวกับกราฟ 2.1
-                backgroundColor: 'rgba(29, 115, 242, 0.1)', // สีพื้นหลังจางๆ ใต้เส้น
-                borderWidth: 3,               // ความหนาของเส้น
-                fill: true,                   // ระบายสีใต้เส้น
-                tension: 0,                   // เส้นตรง (ไม่โค้ง) ตามแบบตัวอย่าง
-                pointBackgroundColor: '#1d73f2', // สีจุด Marker
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 5,               // ขนาดจุด
-                pointHoverRadius: 7           // ขนาดจุดเมื่อเอาเมาส์ไปชี้
+                borderColor: '#1d73f2',
+                backgroundColor: 'rgba(29, 115, 242, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0,
+                pointBackgroundColor: '#1d73f2',
+                pointRadius: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
             scales: {
-                y: { 
-                    beginAtZero: true,
-                    border: { display: false },
-                    ticks: { 
-                        stepSize: 2, // ระยะห่างตัวเลขแกน Y ตามตัวอย่าง
-                        font: { family: "'Prompt', sans-serif" } 
-                    },
-                    grid: { color: '#f0f0f0' } // เส้นตารางแนวนอนสีจาง
-                },
-                x: {
-                    border: { display: false },
-                    grid: { display: true, color: '#f0f0f0' }, // แสดงเส้นตารางแนวตั้งสีจางตามแบบ
-                    ticks: { 
-                        font: { family: "'Prompt', sans-serif", size: 11 },
-                        maxRotation: 45,
-                        minRotation: 0
-                    }
-                }
-            }
+                y: { beginAtZero: true, ticks: { precision: 0 } },
+                x: { grid: { display: true, color: '#f0f0f0' }, ticks: { font: { family: "'Prompt', sans-serif", size: 10 } } }
+            },
+            plugins: { legend: { display: false } }
         }
     });
 }
@@ -295,17 +287,17 @@ function generateReport() {
 // admin-report.js
 
 function applyFilters() { 
-    // 1. ดึงประวัติการใช้งานทั้งหมดจากฐานข้อมูล
+    // 1. ดึงข้อมูล Log ทั้งหมดที่สิ้นสุดการใช้งานแล้ว
     const allStatsLogs = allLogs.filter(l => l.action === 'END_SESSION');
 
-    // 2. ดึงค่าจากตัวคัดกรองบนหน้าจอ
+    // 2. ดึงค่าตัวคัดกรองจากหน้าจอ
     const userModeEl = document.querySelector('input[name="userTypeOption"]:checked');
     const userMode = userModeEl ? userModeEl.value : 'all';
     const timeMode = document.getElementById('timeFilterType').value;
-    const selectedFaculties = getCheckedValues('studentFacultyList'); 
+    const selectedFaculties = getCheckedValues('studentFacultyList');
     const selectedOrgs = getCheckedValues('staffOrgList');
 
-    // 3. กรองข้อมูลตามประวัติการใช้งาน (Filtering Logic)
+    // 3. กรองข้อมูลตามเงื่อนไข
     let filteredLogs = allStatsLogs.filter(log => {
         const logDate = new Date(log.startTime || log.timestamp);
         const logFaculty = (log.userFaculty || "").trim();
@@ -318,73 +310,68 @@ function applyFilters() {
                 start.setHours(0,0,0,0); end.setHours(23,59,59,999);
                 if (logDate < start || logDate > end) return false;
             }
+        } else if (timeMode === 'monthly') {
+            const mStart = new Date(document.getElementById('monthStart').value + "-01");
+            const mEndInput = document.getElementById('monthEnd').value;
+            const mEndParts = mEndInput.split('-');
+            const mEnd = new Date(mEndParts[0], mEndParts[1], 0, 23, 59, 59);
+            if (logDate < mStart || logDate > mEnd) return false;
         }
 
-        // กรองตามประเภทผู้ใช้ และชื่อคณะ/หน่วยงาน
+        // กรองตามประเภทผู้ใช้
         const role = (log.userRole || '').toLowerCase();
-        
         if (userMode === 'student') {
             if (role !== 'student') return false;
-            if (selectedFaculties.length === 0) return false; 
-            
-            // ✅ แก้ไข: เทียบชื่อแบบยืดหยุ่น (Fuzzy Match) เพื่อให้หาชื่อคณะเจอแม้สะกดไม่ตรงเป๊ะ
-            const isMatched = selectedFaculties.some(fac => fac.includes(logFaculty) || logFaculty.includes(fac));
-            if (!isMatched) return false;
-        } 
-        else if (userMode === 'staff') {
+            return selectedFaculties.some(fac => fac.includes(logFaculty) || logFaculty.includes(fac));
+        } else if (userMode === 'staff') {
             if (role !== 'staff' && role !== 'admin') return false;
-            if (selectedOrgs.length === 0) return false;
-            
-            const isMatched = selectedOrgs.some(org => org.includes(logFaculty) || logFaculty.includes(org));
-            if (!isMatched) return false;
-        } 
-        // 🌟 เพิ่มส่วนนี้เข้าไปเพื่อให้ "บุคคลภายนอก" แสดงผล
-        else if (userMode === 'external') {
-            if (role !== 'external') return false;
+            return selectedOrgs.some(org => org.includes(logFaculty) || logFaculty.includes(org));
+        } else if (userMode === 'external') {
+            return role === 'external';
         }
-        
         return true;
     });
 
-    // --- ส่วนการแสดงผล (Rendering) ---
-
-    // ✅ อัปเดตการ์ดสรุป: นับตามประวัติการใช้งานจริง (Sessions) ไม่ตัดคนซ้ำ
-    updateSummaryCards(filteredLogs);
-
-    // เตรียมข้อมูลกราฟ
+    // 4. เตรียมข้อมูลกราฟ
     let distributionData = {};
-    const dailyData = {};
+    const timeChartData = {};
 
     filteredLogs.forEach(l => {
-        let label = l.userFaculty || 'ไม่ระบุ';
-        
+        // กราฟ 2.1: แยกกลุ่มผู้ใช้ (คง นักศึกษา/บุคลากร/ภายนอก ไว้)
+        let distLabel = l.userFaculty || 'ไม่ระบุ';
         if (userMode === 'all') {
-            if (l.userRole === 'student') label = "นักศึกษา";
-            else if (l.userRole === 'staff' || l.userRole === 'admin') label = "บุคลากร";
-            else label = "บุคคลภายนอก";
-        } 
-        else if (userMode === 'external') {
-            label = "บุคคลภายนอก";
+            if (l.userRole === 'student') distLabel = "นักศึกษา";
+            else if (l.userRole === 'staff' || l.userRole === 'admin') distLabel = "บุคลากร";
+            else distLabel = "บุคคลภายนอก";
         }
+        distributionData[distLabel] = (distributionData[distLabel] || 0) + 1;
 
-        distributionData[label] = (distributionData[label] || 0) + 1;
-        const d = new Date(l.timestamp).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-        dailyData[d] = (dailyData[d] || 0) + 1;
+        // กราฟ 2.2: กำหนด Label แกน X (โหมด Monthly ใช้รายวันเหมือน Daily)
+        const dateObj = new Date(l.startTime || l.timestamp);
+        let timeLabel;
+        if (timeMode === 'daily' || timeMode === 'monthly') {
+            timeLabel = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+        } else if (timeMode === 'yearly') {
+            timeLabel = dateObj.toLocaleDateString('th-TH', { month: 'long' });
+        }
+        timeChartData[timeLabel] = (timeChartData[timeLabel] || 0) + 1;
     });
 
-    // วาดกราฟใหม่ตามข้อมูลประวัติที่กรองมา
+    // 5. อัปเดตส่วนต่าง ๆ
+    updateSummaryCards(filteredLogs);
     drawDistributionBarChart(distributionData);
-    drawDailyTrendLineChart(dailyData);
+    drawDailyTrendLineChart(timeChartData, timeMode);
 
-    // ✅ ตารางประวัติ: แสดง "ประวัติทั้งหมด" เสมอเพื่อให้ตรวจสอบย้อนหลังได้ง่าย
-    renderLogHistory(allLogs);
-
-    // อัปเดตข้อมูล Global
-    const globalChartData = processLogsForCharts(allStatsLogs, timeMode);
+    const globalChartData = processLogsForCharts(filteredLogs, timeMode);
+    if (topSoftwareChartInstance) topSoftwareChartInstance.destroy();
     topSoftwareChartInstance = drawTopSoftwareChart(globalChartData.softwareStats);
+    
+    if (pieChartInstance) pieChartInstance.destroy();
     pieChartInstance = drawAIUsagePieChart(globalChartData.aiUsageData);
+    
     drawSatisfactionChart(globalChartData.satisfactionData);
-    renderFeedbackComments(allLogs);
+    renderFeedbackComments(filteredLogs);
+    renderLogHistory(filteredLogs);
 }
 
 function updateSummaryCards(data) {
