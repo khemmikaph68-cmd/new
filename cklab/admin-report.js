@@ -290,88 +290,93 @@ function generateReport() {
     applyFilters(); 
 }
 
+/* admin-report.js - แก้ไขลอจิก applyFilters ตามความต้องการของผู้ใช้ */
+
 function applyFilters() { 
-    const logs = allLogs;
+    // 1. ข้อมูลทั้งหมดในระบบ (Global Data) สำหรับ Feedback และกราฟวิเคราะห์รวม
+    const allStatsLogs = allLogs.filter(l => l.action === 'END_SESSION');
+
+    // 2. ดึงค่าตัวกรองจาก UI
     const userModeEl = document.querySelector('input[name="userTypeOption"]:checked');
     const userMode = userModeEl ? userModeEl.value : 'all';
     const timeMode = document.getElementById('timeFilterType').value;
-
-    const selectedFaculties = getCheckedValues('studentFacultyList');
+    const selectedFaculties = getCheckedValues('studentFacultyList'); 
     const selectedOrgs = getCheckedValues('staffOrgList');
 
-    let filteredLogs = logs.filter(log => {
+    // 3. กรองข้อมูล (Filtered Data) สำหรับ Summary Cards และกราฟ 2.1, 2.2
+    let filteredLogs = allLogs.filter(log => {
         const logDate = new Date(log.startTime || log.timestamp);
+        
+        // กรองตามเวลา
         if (timeMode === 'daily') {
             const start = new Date(document.getElementById('dateStart').value);
             const end = new Date(document.getElementById('dateEnd').value);
-            if (isNaN(start) || isNaN(end)) return true;
-            start.setHours(0,0,0,0); end.setHours(23,59,59,999);
-            return logDate >= start && logDate <= end;
-        } 
-        // ... ส่วนเดือนและปี (ใช้ Logic เดิมในไฟล์ของคุณ)
+            if (!isNaN(start) && !isNaN(end)) {
+                start.setHours(0,0,0,0); end.setHours(23,59,59,999);
+                if (logDate < start || logDate > end) return false;
+            }
+        }
+
+        // ลอจิก: ถ้าเลือกหมวดแต่ไม่ติ๊กเลือกรายการย่อยเลย = ไม่แสดงข้อมูล
+        const role = (log.userRole || '').toLowerCase();
+        if (userMode === 'student') {
+            if (role !== 'student') return false;
+            if (selectedFaculties.length === 0) return false; 
+            if (!selectedFaculties.includes(log.userFaculty)) return false; 
+        } else if (userMode === 'staff') {
+            if (role !== 'staff' && role !== 'admin') return false;
+            if (selectedOrgs.length === 0) return false; 
+            if (!selectedOrgs.includes(log.userFaculty)) return false; 
+        }
         return true;
     });
 
-    // กรองประเภทผู้ใช้
-    filteredLogs = filteredLogs.filter(log => {
-        const role = (log.userRole || '').toLowerCase();
-        if (userMode === 'all') return true;
-        if (userMode === 'student') {
-            if (role !== 'student') return false;
-            if (selectedFaculties.length > 0 && !selectedFaculties.includes(log.userFaculty)) return false;
-            return true;
-        } 
-        if (userMode === 'staff') {
-            if (role !== 'staff' && role !== 'admin') return false;
-            if (selectedOrgs.length > 0 && !selectedOrgs.includes(log.userFaculty)) return false;
-            return true;
-        } 
-        return role === 'external' || role === 'guest';
-    });
+    const statsFilteredLogs = filteredLogs.filter(l => l.action === 'END_SESSION');
 
-    const statsLogs = filteredLogs.filter(l => l.action === 'END_SESSION');
-    updateSummaryCards(statsLogs);
+    // --- ส่วนที่ 1: อัปเดตข้อมูลตามการคัดกรอง ---
+    updateSummaryCards(statsFilteredLogs); // อัปเดต Card สถิติ
 
-    // ประมวลผลข้อมูลกราฟ 2.1 และ 2.2
     let distributionData = {};
     const dailyData = {};
-    statsLogs.forEach(l => {
+    statsFilteredLogs.forEach(l => {
         let label = l.userFaculty || 'ไม่ระบุ';
         if (userMode === 'all') {
             if (l.userRole === 'student') label = "นักศึกษา";
             else if (l.userRole === 'staff' || l.userRole === 'admin') label = "บุคลากร";
             else label = "บุคคลภายนอก";
         }
+        // นับตามจำนวนการเข้าใช้งาน (Sessions)
         distributionData[label] = (distributionData[label] || 0) + 1;
         const d = new Date(l.timestamp).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
         dailyData[d] = (dailyData[d] || 0) + 1;
     });
 
-    try {
-        drawDistributionBarChart(distributionData);
-        drawDailyTrendLineChart(dailyData);
+    drawDistributionBarChart(distributionData); // กราฟ 2.1
+    drawDailyTrendLineChart(dailyData);       // กราฟ 2.2
+    renderLogHistory(filteredLogs);           // ตารางประวัติ
 
-        // คืนค่าฟังก์ชันประมวลผลกราฟเดิมทั้งหมด
-        const data = processLogsForCharts(statsLogs, timeMode);
-        topSoftwareChartInstance = drawTopSoftwareChart(data.softwareStats);
-        pieChartInstance = drawAIUsagePieChart(data.aiUsageData);
-        pcAvgChartInstance = drawPCAvgTimeChart(data.pcAvgTimeData);
-        drawSatisfactionChart(data.satisfactionData);
-        
-        // คืนค่าส่วน Feedback และ Table
-        renderFeedbackComments(filteredLogs);
-        renderLogHistory(filteredLogs);
-    } catch (e) { console.error("Error:", e); }
+    // --- ส่วนที่ 2: อัปเดตข้อมูลรวมทั้งหมด (Global) ---
+    const globalChartData = processLogsForCharts(allStatsLogs, timeMode);
+    topSoftwareChartInstance = drawTopSoftwareChart(globalChartData.softwareStats);
+    pieChartInstance = drawAIUsagePieChart(globalChartData.aiUsageData);
+    drawSatisfactionChart(globalChartData.satisfactionData);
+    renderFeedbackComments(allLogs); // Feedback แสดงทั้งหมดเสมอ
 }
 
 function updateSummaryCards(data) {
-    const sessionCount = data.length;
+    // 1. จำนวนผู้ใช้งาน: นับแบบไม่ซ้ำคน (Unique Users) โดยใช้ Set
     const uniqueUsers = new Set(data.map(log => log.userId)).size;
+
+    // 2. การเข้าใช้งาน: นับจำนวนรายการทั้งหมด (Sessions)
+    const sessionCount = data.length;
+
+    // 3. คำนวณเวลารวม
     let totalMinutes = 0;
-    data.forEach(log => { totalMinutes += (log.durationMinutes || 60); });
+    data.forEach(log => { totalMinutes += (log.durationMinutes || 0); });
     const totalHours = (totalMinutes / 60).toFixed(1);
 
-    animateValue("resultUserCount", 0, uniqueUsers, 500);
+    // แสดงผลบนหน้าจอ
+    animateValue("resultUserCount", 0, uniqueUsers, 500); 
     animateValue("resultSessionCount", 0, sessionCount, 500);
     animateValue("resultTotalHours", 0, parseFloat(totalHours), 500);
 }
