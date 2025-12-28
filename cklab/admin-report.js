@@ -32,7 +32,7 @@ function drawDistributionBarChart(data) {
         data: {
             labels: sortedData.map(x => x[0]),
             datasets: [{
-                label: 'จำนวนคน',
+                label: 'จำนวนครั้ง',
                 data: sortedData.map(x => Math.floor(x[1])),
                 backgroundColor: '#1d73f2',
                 borderRadius: 4,
