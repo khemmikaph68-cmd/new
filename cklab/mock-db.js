@@ -99,10 +99,10 @@ const DEFAULT_GENERAL_CONFIG = {
 
 // 1.7 จำลอง External System: REG API
 const MOCK_REG_DB = {
-    "66123456": { prefix: "นาย", name: "สมชาย รักเรียน", faculty: "วิศวกรรมศาสตร์", department: "คอมพิวเตอร์", year: "3", level: "ปริญญาตรี", role: "student" },
-    "66112233": { prefix: "นางสาว", name: "มานี มีปัญญา", faculty: "วิทยาศาสตร์", department: "วิทยาการคอมพิวเตอร์", year: "2", level: "ปริญญาตรี", role: "student" },
-    "66100000": { prefix: "นาย", name: "เอกภพ มั่นคง", faculty: "มนุษยศาสตร์", department: "ภาษาไทย", year: "4", level: "ปริญญาตรี", role: "student" },
-    "66100001": { prefix: "นางสาว", name: "ดวงดาว ไกลโพ้น", faculty: "ศึกษาศาสตร์", department: "คณิตศาสตร์", year: "1", level: "ปริญญาตรี", role: "student" },
+    "66123456": { prefix: "นาย", name: "สมชาย รักเรียน", faculty: "คณะวิศวกรรมศาสตร์", department: "คอมพิวเตอร์", year: "3", level: "ปริญญาตรี", role: "student" },
+    "66112233": { prefix: "นางสาว", name: "มานี มีปัญญา", faculty: "คณะวิทยาศาสตร์", department: "วิทยาการคอมพิวเตอร์", year: "2", level: "ปริญญาตรี", role: "student" },
+    "66100000": { prefix: "นาย", name: "เอกภพ มั่นคง", faculty: "คณะมนุษยศาสตร์", department: "ภาษาไทย", year: "4", level: "ปริญญาตรี", role: "student" },
+    "66100001": { prefix: "นางสาว", name: "ดวงดาว ไกลโพ้น", faculty: "คณะศึกษาศาสตร์", department: "คณิตศาสตร์", year: "1", level: "ปริญญาตรี", role: "student" },
     "67200000": { prefix: "นาย", name: "ผู้มาเยือน", faculty: "บุคคลภายนอก", department: "-", year: "-", level: "บุคคลทั่วไป", role: "external" },
     "ubu_staff": { prefix: "ดร.", name: "ใจดี มีวิชา", faculty: "สำนักคอมพิวเตอร์และเครือข่าย", department: "-", year: "-", level: "บุคลากร", role: "staff" },
     "staff_karnklang": { prefix: "นาย", name: "บุคลากร กองกลาง", faculty: "กองกลาง", year: "-", level: "บุคลากร", role: "staff" },

@@ -180,31 +180,27 @@
                     <div id="filter-student-section" class="filter-section bg-light p-3 rounded mb-4 d-none">
                         <h6 class="fw-bold text-primary mb-3">ตัวกรองข้อมูลนักศึกษา</h6>
                         <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">คณะ / สังกัด</label>
+                            <div class="col-md-9">
+                                <label class="form-label small fw-bold">คณะ</label>
                                 <div id="studentFacultyList" class="scrollable-checkbox-list"></div>
                                 <div class="mt-1 text-end">
                                     <small class="text-primary cursor-pointer fw-bold" onclick="toggleCheckAll('studentFacultyList')">เลือกทั้งหมด / ล้าง</small>
                                 </div>
                             </div>
+                            
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold">ระดับ</label>
-                                <select id="filterEduLevel" class="form-select">
-                                    <option value="all">ทั้งหมด</option>
-                                    <option value="ปริญญาตรี">ปริญญาตรี</option>
-                                    <option value="ปริญญาโท">ปริญญาโท</option>
-                                    <option value="ปริญญาเอก">ปริญญาเอก</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold">ชั้นปี</label>
-                                <select id="filterYear" class="form-select">
-                                    <option value="all">ทั้งหมด</option>
-                                    <option value="1">ปี 1</option>
-                                    <option value="2">ปี 2</option>
-                                    <option value="3">ปี 3</option>
-                                    <option value="4">ปี 4</option>
-                                    <option value="5+">ปี 5+</option>
+                                <label class="form-label small fw-bold">ระดับการศึกษา / ชั้นปี</label>
+                                <select id="combinedYearLevel" class="form-select">
+                                    <option value="all">-- ทั้งหมด --</option>
+                                        <option value="1">ชั้นปีที่ 1</option>
+                                        <option value="2">ชั้นปีที่ 2</option>
+                                        <option value="3">ชั้นปีที่ 3</option>
+                                        <option value="4">ชั้นปีที่ 4</option>
+                                        <option value="5+">ชั้นปีที่ 5+</option>
+                                        <option value="undergrad_all">ปริญญาตรี</option>
+                                        <option value="ปริญญาโท">ปริญญาโท</option>
+                                        <option value="ปริญญาเอก">ปริญญาเอก</option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>
@@ -303,7 +299,7 @@
             <div class="row g-4 mb-4">
                 <div class="col-12">
                     <div class="card border-0 shadow-sm p-3">
-                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-bar-chart-fill me-2"></i>2.1 การกระจายตัวตามสังกัด/กลุ่มผู้ใช้</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-bar-chart-fill me-2"></i> การกระจายตัวตามกลุ่มผู้ใช้</h6>
                         <div class="bg-light p-3 rounded" style="height: 350px;">
                             <canvas id="distributionBarChart"></canvas>
                         </div>
@@ -311,7 +307,7 @@
                 </div>
                 <div class="col-12">
                     <div class="card border-0 shadow-sm p-3">
-                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-graph-up me-2"></i>2.2 แนวโน้มผู้เข้าใช้งานรวมรายวัน</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-graph-up me-2"></i> แนวโน้มผู้เข้าใช้งานรวมรายวัน</h6>
                         <div class="bg-light p-3 rounded" style="height: 350px;">
                             <canvas id="dailyTrendLineChart"></canvas>
                         </div>
@@ -330,7 +326,7 @@
                 </div>
                 <div class="col-lg-6">
                     <div class="card border-0 shadow-sm p-3 h-100">
-                        <h6 class="fw-bold text-dark mb-3">2. ใช้งาน AI vs ใช้งานทั่วไป</h6>
+                        <h6 class="fw-bold text-dark mb-3"> ใช้งาน AI vs ใช้งานทั่วไป</h6>
                         <div class="d-flex justify-content-center" style="max-height: 300px;">
                             <canvas id="aiUsagePieChart"></canvas>
                         </div>
@@ -338,7 +334,7 @@
                 </div>
                 <div class="col-lg-6">
                     <div class="card border-0 shadow-sm p-3 h-100">
-                        <h6 class="fw-bold text-dark mb-3">3. คะแนนความพึงพอใจ (Satisfaction)</h6>
+                        <h6 class="fw-bold text-dark mb-3"> คะแนนความพึงพอใจ (Satisfaction)</h6>
                         <div class="card-body p-0">
                             <div class="d-flex align-items-end mb-3">
                                 <h1 class="fw-bold text-warning mb-0 me-3" style="font-size: 3.5rem;" id="satisfactionAvgScore">0.0</h1>
@@ -368,7 +364,7 @@
             <div class="row g-4">
                 <div class="col-12">
                     <div class="card border-0 shadow-sm p-3">
-                        <h6 class="fw-bold text-dark mb-3">5. ประวัติการใช้งานโดยละเอียด (Log History)</h6>
+                        <h6 class="fw-bold text-dark mb-3"> ประวัติการใช้งานโดยละเอียด (Log History)</h6>
                         <div class="table-responsive rounded-3 border">
                             <table class="table table-custom table-bordered align-middle mb-0 table-hover">
                                 <thead class="sticky-top shadow-sm bg-white">
@@ -379,8 +375,8 @@
                                         <th>Software</th>
                                         <th>วันที่</th>
                                         <th>เวลา</th>
-                                        <th>คณะ/สังกัด</th>
-                                        <th>สถานะ</th>
+                                        <th>คณะ/หน่วยงาน</th>
+                                        <th>ชั้นปี</th> <th>สถานะ</th>
                                         <th>PC</th>
                                         <th>คะแนน</th>
                                     </tr>

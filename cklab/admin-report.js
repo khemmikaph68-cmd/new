@@ -302,7 +302,7 @@ function applyFilters() {
         const logDate = new Date(log.startTime || log.timestamp);
         const logFaculty = (log.userFaculty || "").trim();
 
-        // กรองตามเวลา
+        // กรองตามเวลา (Daily / Monthly)
         if (timeMode === 'daily') {
             const start = new Date(document.getElementById('dateStart').value);
             const end = new Date(document.getElementById('dateEnd').value);
@@ -318,17 +318,48 @@ function applyFilters() {
             if (logDate < mStart || logDate > mEnd) return false;
         }
 
-        // กรองตามประเภทผู้ใช้
         const role = (log.userRole || '').toLowerCase();
+        
+        // ✅ [LOGIC แก้ไข] การกรองข้อมูลนักศึกษา
         if (userMode === 'student') {
             if (role !== 'student') return false;
-            return selectedFaculties.some(fac => fac.includes(logFaculty) || logFaculty.includes(fac));
-        } else if (userMode === 'staff') {
+            
+            // ตรวจสอบคณะ
+            const isFacultyMatch = selectedFaculties.some(fac => fac.trim() === logFaculty);
+            if (!isFacultyMatch) return false;
+
+            // ตรวจสอบ ระดับการศึกษา / ชั้นปี
+            const combinedValue = document.getElementById('combinedYearLevel').value;
+            const userLevel = (log.userLevel || "").toString().trim();
+            const userYear = (log.userYear || "").toString().trim(); // ค่าจาก DB เช่น "5"
+
+            if (combinedValue !== 'all') {
+                if (combinedValue === 'undergrad_all') {
+                    // กรณีเลือก ปริญญาตรี (ทั้งหมด) -> เอาทุกชั้นปีที่เป็น ป.ตรี
+                    if (userLevel !== 'ปริญญาตรี') return false;
+                } 
+                else if (combinedValue === 'ปริญญาโท' || combinedValue === 'ปริญญาเอก') {
+                    if (userLevel !== combinedValue) return false;
+                } 
+                else if (combinedValue === '5+') {
+                    // ✅ แก้ไขจุดนี้: ถ้าเลือก 5+ ให้เช็คว่าเป็น ป.ตรี และ ปีตั้งแต่ 5 ขึ้นไป
+                    const yNum = parseInt(userYear);
+                    if (userLevel !== 'ปริญญาตรี' || isNaN(yNum) || yNum < 5) return false;
+                } 
+                else {
+                    // กรณีเลือกปี 1, 2, 3, 4
+                    if (userLevel !== 'ปริญญาตรี' || userYear !== combinedValue) return false;
+                }
+            }
+        } 
+        else if (userMode === 'staff') {
             if (role !== 'staff' && role !== 'admin') return false;
-            return selectedOrgs.some(org => org.includes(logFaculty) || logFaculty.includes(org));
-        } else if (userMode === 'external') {
-            return role === 'external';
+            return selectedOrgs.some(org => org.trim() === logFaculty);
+        } 
+        else if (userMode === 'external') {
+            if (role !== 'external') return false;
         }
+        
         return true;
     });
 
@@ -711,6 +742,10 @@ function renderLogHistory(logs) {
                 <td class="text-center">${dateStr}</td>
                 <td class="text-center"><span class="badge bg-light text-dark border">${timeRangeStr}</span></td>
                 <td>${log.userFaculty || '-'}</td>
+                <td class="text-center"> ${log.userRole === 'student' ? 
+                        `<span class="badge bg-info bg-opacity-10 text-info border border-info px-2" style="font-size: 0.75rem;">ปี ${log.userYear || 'N/A'}</span>` 
+                        : '-'}
+                </td>
                 <td class="text-center">${roleBadge}</td>
                 <td class="text-center"><span class="badge bg-dark bg-opacity-75">PC-${log.pcId}</span></td>
                 <td class="text-center">${score}</td>
