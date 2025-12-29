@@ -354,8 +354,18 @@ function applyFilters() {
         } 
         else if (userMode === 'staff') {
             if (role !== 'staff' && role !== 'admin') return false;
-            return selectedOrgs.some(org => org.trim() === logFaculty);
-        } 
+
+            // ดึงชื่อหน่วยงานจาก Log และลบเครื่องหมาย \ และ " ออกให้หมดก่อนเทียบ
+            const currentLogFaculty = (log.userFaculty || "").replace(/["\\]/g, "").trim();
+
+            return selectedOrgs.some(org => {
+                // ลบเครื่องหมาย " และ \ ออกจากตัวเลือกที่ติ๊กมาด้วย
+                const selectedOrgClean = org.replace(/["\\]/g, "").trim();
+                
+                // เทียบเนื้อหาข้อความเพียวๆ
+                return selectedOrgClean === currentLogFaculty;
+            });
+        }
         else if (userMode === 'external') {
             if (role !== 'external') return false;
         }

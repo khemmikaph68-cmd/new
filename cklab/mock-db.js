@@ -121,7 +121,7 @@ const MOCK_REG_DB = {
     "66090001": { prefix: "น.ศ.", name: "ศิลป์ ออกแบบ", faculty: "คณะศิลปประยุกต์และสถาปัตยกรรมศาสตร์", year: "1", level: "ปริญญาตรี", role: "student" },
     "66100002": { prefix: "น.ศ.", name: "ครู ศึกษา", faculty: "คณะศึกษาศาสตร์", year: "2", level: "ปริญญาตรี", role: "student" },
     "66110001": { prefix: "น.ศ.", name: "เกษตร ยั่งยืน", faculty: "คณะเกษตรศาสตร์", year: "3", level: "ปริญญาตรี", role: "student" },
-    "66120001": { prefix: "น.ศ.พ.", name: "หมอ รักษา", faculty: "วิทยาลัยแพทยศาสตร์และการสาธารณสุข", year: "6", level: "ปริญญาตรี", role: "student" },
+    "66120001": { prefix: "น.ศ.พ.", name: "หมอ รักษา", faculty: "วิทยาลัยแพทยศาสตร์และการสาธารณสุข", year: "5", level: "ปริญญาตรี", role: "student" },
     "staff_uplace": { prefix: "จนท.", name: "ยูเพลส บริการ", faculty: "สถานปฏิบัติการโรงแรมฯ (U-Place)", year: "-", level: "บุคลากร", role: "staff" },
     "staff_council": { prefix: "อ.", name: "สภา อาจารย์", faculty: "สภาอาจารย์", year: "-", level: "บุคลากร", role: "staff" },
     "staff_audit": { prefix: "นาย", name: "ตรวจสอบ ภายใน", faculty: "สำนักงานตรวจสอบภายใน", year: "-", level: "บุคลากร", role: "staff" },
@@ -139,6 +139,7 @@ const MOCK_REG_DB = {
     "staff_asset": { prefix: "ผอ.", name: "ทรัพย์สิน ประโยชน์", faculty: "สำนักบริหารทรัพย์สินและสิทธิประโยชน์", year: "-", level: "บุคลากร", role: "staff" },
     "staff_library": { prefix: "บรรณารักษ์", name: "วิทย บริการ", faculty: "สำนักวิทยบริการ", year: "-", level: "บุคลากร", role: "staff" },
     "staff_scipark": { prefix: "CEO", name: "อุทยาน วิทย์", faculty: "อุทยานวิทยาศาสตร์มหาวิทยาลัยอุบลราชธานี", year: "-", level: "บุคลากร", role: "staff" },
+    "staff_sesame": { prefix: "ป้า", name: "งา ยั่งยืน", faculty: "ศูนย์การเรียนรู้และพัฒนา \"งา\" เชิงเกษตรอุตสาหกรรมครัวเรือนแบบยั่งยืน", year: "-", level: "บุคลากร", role: "staff" },
     "staff_print": { prefix: "ช่าง", name: "โรงพิมพ์ ม.อุบล", faculty: "โรงพิมพ์มหาวิทยาลัยอุบลราชธานี", year: "-", level: "บุคลากร", role: "staff" }
 };
 
