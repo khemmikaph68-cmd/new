@@ -25,8 +25,19 @@ function drawDistributionBarChart(data) {
     if (!ctx) return;
     if (distributionBarInstance) distributionBarInstance.destroy();
 
-    const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    const customOrder = { "นักศึกษา": 1, "บุคลากร": 2, "บุคคลภายนอก": 3 };
     
+    const sortedData = Object.entries(data).sort((a, b) => {
+        const orderA = customOrder[a[0]] || 99; // ถ้าไม่ใช่ 3 กลุ่มนี้ให้ไปอยู่ท้ายสุด
+        const orderB = customOrder[b[0]] || 99;
+        
+        if (orderA !== orderB) {
+            return orderA - orderB; // เรียงตาม 1, 2, 3
+        }
+        return b[1] - a[1]; // กรณีเป็นโหมดอื่น (เช่น รายคณะ) ให้เรียงตามจำนวนเหมือนเดิม
+    });
+    // --------------------------------------
+
     distributionBarInstance = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -37,12 +48,9 @@ function drawDistributionBarChart(data) {
                 backgroundColor: '#1d73f2',
                 borderRadius: 4,
                 
-                // 🛠️ ส่วนสำคัญที่ทำให้แท่งรวมกลุ่มตรงกลาง:
-                // 1. categoryPercentage: บีบพื้นที่รวมของกลุ่มแท่ง (ยิ่งน้อย ยิ่งกองอยู่ตรงกลาง)
+                // คงค่าเหล่านี้ไว้ตามเดิมเพื่อขนาดแท่งที่สวยงาม
                 categoryPercentage: 0.3, 
-                // 2. barPercentage: ความกว้างของแท่งภายในพื้นที่ที่บีบ (ปรับให้ผอมตามชอบ)
                 barPercentage: 0.5,
-                // ล็อกความหนาสูงสุดเพื่อความสวยงาม
                 maxBarThickness: 35
             }]
         },
@@ -316,6 +324,14 @@ function applyFilters() {
             const mEndParts = mEndInput.split('-');
             const mEnd = new Date(mEndParts[0], mEndParts[1], 0, 23, 59, 59);
             if (logDate < mStart || logDate > mEnd) return false;
+        // ค้นหาส่วนการกรองเวลาในฟังก์ชัน applyFilters และเพิ่มเงื่อนไข yearly ต่อจากรายเดือน
+        } else if (timeMode === 'yearly') {
+            const yStart = parseInt(document.getElementById('yearStart').value);
+            const yEnd = parseInt(document.getElementById('yearEnd').value);
+            const logYear = logDate.getFullYear(); // ดึงปี ค.ศ. จากข้อมูล Log
+            
+            // ตรวจสอบว่าปีใน Log อยู่ในช่วงที่เลือกหรือไม่
+            if (logYear < yStart || logYear > yEnd) return false;
         }
 
         const role = (log.userRole || '').toLowerCase();
@@ -352,18 +368,17 @@ function applyFilters() {
                 }
             }
         } 
+        // ค้นหาเงื่อนไขการกรองของ staff ในฟังก์ชัน applyFilters
         else if (userMode === 'staff') {
             if (role !== 'staff' && role !== 'admin') return false;
 
-            // ดึงชื่อหน่วยงานจาก Log และลบเครื่องหมาย \ และ " ออกให้หมดก่อนเทียบ
             const currentLogFaculty = (log.userFaculty || "").replace(/["\\]/g, "").trim();
 
             return selectedOrgs.some(org => {
-                // ลบเครื่องหมาย " และ \ ออกจากตัวเลือกที่ติ๊กมาด้วย
                 const selectedOrgClean = org.replace(/["\\]/g, "").trim();
                 
-                // เทียบเนื้อหาข้อความเพียวๆ
-                return selectedOrgClean === currentLogFaculty;
+                // แก้ไขจากการใช้ === เป็นการใช้ .includes() เพื่อลดปัญหาเรื่องเครื่องหมายพิเศษ
+                return currentLogFaculty.includes(selectedOrgClean) || selectedOrgClean.includes(currentLogFaculty);
             });
         }
         else if (userMode === 'external') {
